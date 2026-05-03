@@ -432,3 +432,36 @@ _MOCK_ROUTES = [
      "total_km": 28.4, "est_minutes": 55, "status": "planned",
      "created_at": _now - timedelta(hours=1)},
 ]
+
+_MOCK_FEEDBACK = [
+    {"feedback_id": "fb-001", "user_id": _uid("donor@foodbridge.com"), "user_name": "Diana Donor", "role": "donor", "rating": 5, "message": "Love this platform! So easy to donate food.", "timestamp": _now - timedelta(days=2)},
+    {"feedback_id": "fb-002", "user_id": _uid("receiver@foodbridge.com"), "user_name": "Rachel NGO", "role": "receiver", "rating": 4, "message": "The priority pickup works great, but I wish I could filter by exact distance.", "timestamp": _now - timedelta(hours=5)},
+]
+
+# ════════════════════════════════════════════════════════════
+# FEEDBACK
+# ════════════════════════════════════════════════════════════
+
+def submit_feedback(user_id: str, user_name: str, role: str, rating: int, message: str) -> str:
+    fb_id = str(uuid.uuid4())
+    doc = {
+        "feedback_id": fb_id,
+        "user_id":     user_id,
+        "user_name":   user_name,
+        "role":        role,
+        "rating":      rating,
+        "message":     message,
+        "timestamp":   datetime.now(timezone.utc),
+    }
+    if db:
+        db.collection("feedback").document(fb_id).set(doc)
+    else:
+        _MOCK_FEEDBACK.append(doc)
+    return fb_id
+
+def get_all_feedback(limit: int = 50) -> list[dict]:
+    if db:
+        docs = db.collection("feedback").order_by("timestamp", direction=firestore.Query.DESCENDING).limit(limit).stream()
+        return [d.to_dict() for d in docs]
+    return sorted(_MOCK_FEEDBACK, key=lambda x: x.get("timestamp") or "", reverse=True)
+

@@ -17,7 +17,7 @@ from datetime import datetime, timezone, timedelta
 from firebase_config import (
     get_all_listings, get_all_users,
     get_all_transactions, get_platform_stats,
-    update_listing_status
+    update_listing_status, get_all_feedback
 )
 from styles import get_css, render_kpi
 
@@ -54,6 +54,7 @@ with st.sidebar:
     st.page_link("pages/02_Receiver.py", label="🤝 Receiver Portal")
     st.page_link("pages/03_Admin.py", label="🛡️ Admin Dashboard")
     st.page_link("pages/04_Route_Optimizer.py", label="🗺️ Route Optimizer")
+    st.page_link("pages/05_Feedback.py", label="💬 Feedback")
     st.markdown("<hr>", unsafe_allow_html=True)
     if st.button("🚪 Sign Out", use_container_width=True):
         for k in list(st.session_state.keys()): del st.session_state[k]
@@ -96,8 +97,8 @@ st.markdown("<br>", unsafe_allow_html=True)
 # ════════════════════════════════════════════════════════════
 # TABS
 # ════════════════════════════════════════════════════════════
-tab_overview, tab_listings, tab_users, tab_revenue, tab_impact = st.tabs([
-    "📊 Overview", "🥬 Listings", "👥 Users", "💰 Revenue", "🌱 Impact"
+tab_overview, tab_listings, tab_users, tab_revenue, tab_impact, tab_feedback = st.tabs([
+    "📊 Overview", "🥬 Listings", "👥 Users", "💰 Revenue", "🌱 Impact", "💬 Feedback"
 ])
 
 
@@ -393,3 +394,40 @@ with tab_impact:
         <div style="font-size:1.1rem;font-weight:700;color:#34D399;">{pct}% of target achieved</div>
     </div>
     """, unsafe_allow_html=True)
+
+
+# ════════════════════════════════════════════════════════════
+# TAB 6 — FEEDBACK
+# ════════════════════════════════════════════════════════════
+with tab_feedback:
+    st.markdown("### 💬 User Feedback")
+    st.markdown("Review feedback submitted by donors and receivers.")
+    
+    feedbacks = get_all_feedback()
+    
+    if not feedbacks:
+        st.info("No feedback has been submitted yet.")
+    else:
+        # Calculate average rating
+        avg_rating = sum(f.get("rating", 0) for f in feedbacks) / len(feedbacks)
+        st.markdown(f"**Average Rating:** {'⭐' * int(avg_rating)} ({avg_rating:.1f}/5.0 from {len(feedbacks)} reviews)")
+        st.markdown("<hr>", unsafe_allow_html=True)
+        
+        for fb in feedbacks:
+            stars = "⭐" * fb.get("rating", 0)
+            role_badge = "🍽️ Donor" if fb.get("role") == "donor" else "🤝 Receiver"
+            time_str = str(fb.get("timestamp", ""))[:16]
+            
+            st.markdown(f"""
+            <div class="glass-card" style="padding: 1.5rem; margin-bottom: 1rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <strong>{fb.get('user_name', 'Anonymous')}</strong> 
+                        <span style="font-size:0.8rem; background:rgba(255,255,255,0.1); padding:0.2rem 0.5rem; border-radius:10px; margin-left:0.5rem;">{role_badge}</span>
+                    </div>
+                    <div style="color:rgba(228,237,255,0.5); font-size:0.8rem;">{time_str}</div>
+                </div>
+                <div style="font-size:1.2rem; margin:0.5rem 0;">{stars}</div>
+                <div style="color:rgba(228,237,255,0.9); font-size:0.95rem; line-height:1.5;">"{fb.get('message', '')}"</div>
+            </div>
+            """, unsafe_allow_html=True)

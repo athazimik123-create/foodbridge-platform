@@ -56,6 +56,7 @@ with st.sidebar:
     if st.session_state.get("user_role") == "admin":
         st.page_link("pages/03_Admin.py", label="🛡️ Admin")
     st.page_link("pages/04_Route_Optimizer.py", label="🗺️ Route Optimizer")
+    st.page_link("pages/05_Feedback.py", label="💬 Feedback")
     st.markdown("<hr>", unsafe_allow_html=True)
     if st.button("🚪 Sign Out", use_container_width=True):
         for k in list(st.session_state.keys()): del st.session_state[k]
