@@ -1,0 +1,25 @@
+# ── Secrets & credentials (NEVER commit these) ───────────────
+.env
+serviceAccountKey.json
+*.json.key
+
+# ── Python cache ──────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# ── Virtual environments ──────────────────────────────────────
+venv/
+.venv/
+env/
+
+# ── OS files ──────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── IDE ───────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
