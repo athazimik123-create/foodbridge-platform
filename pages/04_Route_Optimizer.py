@@ -10,6 +10,8 @@
 # ============================================================
 
 import streamlit as st
+st.set_page_config(page_title="Route Optimizer · FoodBridge", page_icon="🗺️", layout="wide")
+
 import math
 from datetime import datetime, timezone
 from itertools import permutations
@@ -21,7 +23,6 @@ from firebase_config import (
 )
 from styles import get_css, render_kpi
 
-st.set_page_config(page_title="Route Optimizer · FoodBridge", page_icon="🗺️", layout="wide")
 st.markdown(get_css(), unsafe_allow_html=True)
 
 # ── Auth guard ────────────────────────────────────────────────

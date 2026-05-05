@@ -8,6 +8,8 @@
 # ============================================================
 
 import streamlit as st
+st.set_page_config(page_title="Donor Dashboard · FoodBridge", page_icon="🍽️", layout="wide")
+
 import time
 from datetime import datetime, timezone, timedelta
 
@@ -17,7 +19,6 @@ from firebase_config import (
 )
 from styles import get_css, render_food_card, render_kpi
 
-st.set_page_config(page_title="Donor Dashboard · FoodBridge", page_icon="🍽️", layout="wide")
 st.markdown(get_css(), unsafe_allow_html=True)
 
 # ── Auth guard ────────────────────────────────────────────────
@@ -112,7 +113,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 # TABS
 # ════════════════════════════════════════════════════════════
 tab_label = "📋 All Listings" if role == "admin" else "📋 My Listings"
-tab_list, tab_new, tab_map = st.tabs([tab_label, "➕ Add New Listing", "📍 Location Preview"])
+tab_list, tab_new, tab_map, tab_smart = st.tabs([tab_label, "➕ Add New Listing", "📍 Location Preview", "🤖 Smart Container"])
 
 # ════════════════════════════════════════════════════════════
 # TAB 1 — MY LISTINGS
@@ -308,5 +309,75 @@ with tab_map:
                          "Status": l.get("status"), "Qty (kg)": l.get("quantity_kg")}
                         for l in my_listings if l.get("lat") and l.get("lng")]
             if map_data:
-                df = pd.DataFrame(map_data)
-                st.map(df)
+                df_map = pd.DataFrame(map_data)
+                if not df_map.empty:
+                    st.map(df_map)
+
+# ════════════════════════════════════════════════════════════
+# TAB 4 — SMART CONTAINER
+# ════════════════════════════════════════════════════════════
+with tab_smart:
+    st.markdown("""<div class="glass-card" style="margin-bottom:1.5rem;">
+        <div style="font-size:1.1rem;font-weight:700;margin-bottom:0.8rem;color:#34D399;">
+            🤖 Smart Container Dashboard
+        </div>
+        <div style="font-size:0.82rem;color:rgba(228,237,255,0.5);">
+            Simulate a community smart container. The container predicts the fill level and food freshness.
+            If the food exceeds the freshness threshold, it is automatically routed to disposal.
+            Otherwise, a listing is created and receivers are notified.
+        </div>
+    </div>""", unsafe_allow_html=True)
+
+    with st.form("smart_container_form", clear_on_submit=False):
+        sc_col1, sc_col2 = st.columns(2)
+        with sc_col1:
+            sc_food_name = st.text_input("Detected Food Name", value="Mixed Surplus Food")
+            sc_qty       = st.slider("Predicted Fill Level (kg)", min_value=0.5, max_value=50.0, value=15.0)
+        with sc_col2:
+            sc_freshness = st.number_input("Predicted Freshness Duration (Days)", min_value=0.0, max_value=30.0, value=3.0, step=0.5)
+            sc_threshold = st.number_input("Disposal Threshold (Days)", min_value=0.5, max_value=30.0, value=1.0, step=0.5,
+                                           help="If predicted freshness is LESS than this threshold, food is considered expired and sent to disposal.")
+        
+        sc_address = st.text_input("Container Location", value="Community Smart Container #1, Bandra, Mumbai")
+
+        sc_submit = st.form_submit_button("🧪 Run Container Simulation", use_container_width=True)
+
+    if sc_submit:
+        is_expired = sc_freshness < sc_threshold
+        status = "disposed" if is_expired else "available"
+        
+        data = {
+            "donor_id":     uid,
+            "donor_name":   st.session_state.user_name + " (Smart Container)",
+            "food_name":    sc_food_name,
+            "food_type":    "Mixed",
+            "quantity_kg":  sc_qty,
+            "servings":     int(sc_qty * 2.5),
+            "description":  f"Auto-detected by Smart Container. Freshness: {sc_freshness} days.",
+            "address":      sc_address,
+            "lat":          19.0596,
+            "lng":          72.8295,
+            "expiry_dt":    (datetime.now(timezone.utc) + timedelta(days=sc_freshness)).isoformat(),
+            "pickup_window": "Flexible",
+            "tags":          ["smart-container"],
+            "premium_pickup": False,
+            "status":       status
+        }
+        
+        with st.spinner("Processing Smart Container data…"):
+            listing_id = create_food_listing(data)
+            time.sleep(1)
+            
+        if is_expired:
+            st.error(f"""
+            🛑 **Food Disposed!**
+            The predicted freshness ({sc_freshness} days) is below the threshold ({sc_threshold} days). 
+            The food has been routed to disposal. (Listing ID: `{listing_id}`)
+            """)
+        else:
+            st.success(f"""
+            ✅ **Food Available!**
+            The food is fresh for {sc_freshness} days. A listing has been automatically created, and nearby receivers have been notified! 
+            (Listing ID: `{listing_id}`)
+            """)
+            st.balloons()

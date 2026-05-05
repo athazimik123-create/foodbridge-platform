@@ -10,10 +10,6 @@
 # ============================================================
 
 import streamlit as st
-from datetime import datetime, timezone
-
-from firebase_config import sign_in, sign_up, FIREBASE_WEB_API_KEY
-from styles import get_css
 
 # ── Page config ───────────────────────────────────────────────
 st.set_page_config(
@@ -22,6 +18,11 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+from datetime import datetime, timezone
+from firebase_config import sign_in, sign_up, FIREBASE_WEB_API_KEY
+from styles import get_css
+
 
 st.markdown(get_css(), unsafe_allow_html=True)
 
@@ -151,14 +152,14 @@ def render_login():
             </div>
             """, unsafe_allow_html=True)
 
-        tab_in, tab_up = st.tabs(["🔐 Sign In", "✨ Register"])
+        tab_in, tab_up = st.tabs(["🔐 Direct Login", "✨ Register"])
 
-        # ── SIGN IN ───────────────────────────────────────────
+        # ── DIRECT LOGIN ───────────────────────────────────────────
         with tab_in:
             with st.form("signin_form", clear_on_submit=False):
                 email = st.text_input("Email", placeholder="you@example.com", key="si_email")
                 pw    = st.text_input("Password", type="password", placeholder="••••••••", key="si_pw")
-                submitted = st.form_submit_button("Sign In →", use_container_width=True)
+                submitted = st.form_submit_button("Direct Login →", use_container_width=True)
 
             if submitted:
                 if not email or not pw:
@@ -322,12 +323,12 @@ def render_home():
             <div class="glass-card" style="padding:1rem;background:rgba(52,211,153,0.06);">
                 <div style="font-size:0.75rem;color:rgba(228,237,255,0.5);text-transform:uppercase;letter-spacing:0.08em;">Platform Revenue</div>
                 <div style="font-size:1.8rem;font-weight:900;color:#34D399;font-family:'Space Grotesk',sans-serif;">
-                    ${stats['total_revenue']:,.2f}
+                    ₹{stats['total_revenue']:,.2f}
                 </div>
                 <div style="font-size:0.74rem;color:rgba(228,237,255,0.4);margin-top:0.2rem;">
-                    💳 Subs: ${stats['sub_rev']:.2f} &nbsp;|&nbsp;
-                    🚚 Logistics: ${stats['logistics_rev']:.2f} &nbsp;|&nbsp;
-                    🌍 CSR: ${stats['csr_rev']:.2f}
+                    💳 Subs: ₹{stats['sub_rev']:.2f} &nbsp;|&nbsp;
+                    🚚 Logistics: ₹{stats['logistics_rev']:.2f} &nbsp;|&nbsp;
+                    🌍 CSR: ₹{stats['csr_rev']:.2f}
                 </div>
             </div>
             """, unsafe_allow_html=True)

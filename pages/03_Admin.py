@@ -9,6 +9,8 @@
 # ============================================================
 
 import streamlit as st
+st.set_page_config(page_title="Admin Dashboard · FoodBridge", page_icon="🛡️", layout="wide")
+
 import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
@@ -21,7 +23,6 @@ from firebase_config import (
 )
 from styles import get_css, render_kpi
 
-st.set_page_config(page_title="Admin Dashboard · FoodBridge", page_icon="🛡️", layout="wide")
 st.markdown(get_css(), unsafe_allow_html=True)
 
 # ── Auth guard ────────────────────────────────────────────────
@@ -86,7 +87,7 @@ kpi_data = [
     ("Available",      str(stats["available"]),      "Open listings"),
     ("Delivered",      str(stats["delivered"]),      "Completed"),
     ("Meals Saved",    f"{stats['meals_saved']:,}",  "Est. meals"),
-    ("Platform Rev.",  f"${stats['total_revenue']:,.2f}", "Total earned"),
+    ("Platform Rev.",  f"₹{stats['total_revenue']:,.2f}", "Total earned"),
 ]
 for col, (label, value, sub) in zip(k, kpi_data):
     with col:
@@ -147,7 +148,7 @@ with tab_overview:
         fig_rev = go.Figure(go.Bar(
             x=rev_labels, y=rev_vals,
             marker=dict(color=rev_colors, opacity=0.85),
-            text=[f"${v:.2f}" for v in rev_vals],
+            text=[f"₹{v:.2f}" for v in rev_vals],
             textposition="outside",
             textfont=dict(color="#E4EDFF"),
         ))
@@ -308,7 +309,7 @@ with tab_revenue:
                 "csr_credit":    "#FB923C",
             },
             markers=True,
-            labels={"amount":"Revenue ($)", "date":"Date", "type":"Stream"},
+            labels={"amount":"Revenue (₹)", "date":"Date", "type":"Stream"},
         )
         fig_line.update_layout(
             title=dict(text="Revenue Over Time by Stream", font=dict(color="#E4EDFF", size=14)),
@@ -326,7 +327,7 @@ with tab_revenue:
         st.markdown("**📋 Transaction Log**")
         df_tx_disp = pd.DataFrame([{
             "TX ID":    t.get("tx_id","")[:8]+"…",
-            "Amount":   f"${t.get('amount',0):.2f}",
+            "Amount":   f"₹{t.get('amount',0):.2f}",
             "Type":     t.get("type",""),
             "User":     t.get("user_id","")[:12]+"…",
             "Timestamp": str(t.get("timestamp",""))[:16],

@@ -188,7 +188,7 @@ def create_food_listing(data: dict) -> str:
         "lat":          data.get("lat", 0.0),
         "lng":          data.get("lng", 0.0),
         "expiry_dt":    data.get("expiry_dt"),
-        "status":       "available",       # available | requested | in_transit | delivered
+        "status":       data.get("status", "available"),  # available | requested | in_transit | delivered | disposed
         "receiver_id":  None,
         "driver_id":    None,
         "created_at":   datetime.now(timezone.utc),
@@ -201,6 +201,16 @@ def create_food_listing(data: dict) -> str:
         db.collection("food_listings").document(listing_id).set(doc)
     else:
         _MOCK_LISTINGS.append(doc)
+        
+    # If the listing is available, we might want to notify receivers.
+    # In a real app, this might trigger a push notification. We'll store it in DB.
+    if doc["status"] == "available":
+        create_platform_notification(
+            title="New Food Listed! 🥗",
+            message=f"{doc['donor_name']} listed {doc['quantity_kg']}kg of {doc['food_name']}.",
+            n_type="new_listing"
+        )
+        
     return listing_id
 
 
@@ -437,6 +447,43 @@ _MOCK_FEEDBACK = [
     {"feedback_id": "fb-001", "user_id": _uid("donor@foodbridge.com"), "user_name": "Diana Donor", "role": "donor", "rating": 5, "message": "Love this platform! So easy to donate food.", "timestamp": _now - timedelta(days=2)},
     {"feedback_id": "fb-002", "user_id": _uid("receiver@foodbridge.com"), "user_name": "Rachel NGO", "role": "receiver", "rating": 4, "message": "The priority pickup works great, but I wish I could filter by exact distance.", "timestamp": _now - timedelta(hours=5)},
 ]
+
+_MOCK_NOTIFICATIONS = [
+    {"notif_id": "nt-001", "receiver_id": "all", "title": "Welcome to FoodBridge!", "message": "Check out the new Smart Container feature.", "type": "system", "created_at": _now - timedelta(days=1), "read": False},
+]
+
+# ════════════════════════════════════════════════════════════
+# NOTIFICATIONS
+# ════════════════════════════════════════════════════════════
+
+def create_platform_notification(title: str, message: str, n_type: str, receiver_id: str = "all") -> str:
+    notif_id = str(uuid.uuid4())
+    doc = {
+        "notif_id":    notif_id,
+        "receiver_id": receiver_id, # 'all' means all receivers see it
+        "title":       title,
+        "message":     message,
+        "type":        n_type,
+        "created_at":  datetime.now(timezone.utc),
+        "read":        False
+    }
+    if db:
+        db.collection("notifications").document(notif_id).set(doc)
+    else:
+        _MOCK_NOTIFICATIONS.append(doc)
+    return notif_id
+
+def get_user_notifications(receiver_id: str, limit: int = 20) -> list[dict]:
+    if db:
+        # Fetch notifications for this receiver or "all"
+        docs_all = db.collection("notifications").where("receiver_id", "in", [receiver_id, "all"]).order_by("created_at", direction=firestore.Query.DESCENDING).limit(limit).stream()
+        res = [d.to_dict() for d in docs_all]
+        res.sort(key=lambda x: x.get("created_at") or "", reverse=True)
+        return res
+    
+    # Mock fallback
+    notifs = [n for n in _MOCK_NOTIFICATIONS if n.get("receiver_id") in (receiver_id, "all")]
+    return sorted(notifs, key=lambda x: x.get("created_at") or "", reverse=True)
 
 # ════════════════════════════════════════════════════════════
 # FEEDBACK

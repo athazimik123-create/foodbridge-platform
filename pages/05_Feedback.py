@@ -5,10 +5,11 @@
 # ============================================================
 
 import streamlit as st
+st.set_page_config(page_title="Feedback · FoodBridge", page_icon="💬", layout="wide")
+
 from firebase_config import submit_feedback
 from styles import get_css
 
-st.set_page_config(page_title="Feedback · FoodBridge", page_icon="💬", layout="wide")
 st.markdown(get_css(), unsafe_allow_html=True)
 
 # ── Auth guard ────────────────────────────────────────────────

@@ -9,16 +9,17 @@
 # ============================================================
 
 import streamlit as st
+st.set_page_config(page_title="Receiver Portal · FoodBridge", page_icon="🤝", layout="wide")
+
 import time
 from datetime import datetime, timezone
 
 from firebase_config import (
     get_available_listings, get_all_listings, request_food,
-    get_receiver_requests, log_transaction
+    get_receiver_requests, log_transaction, get_user_notifications
 )
 from styles import get_css, render_food_card, render_kpi
 
-st.set_page_config(page_title="Receiver Portal · FoodBridge", page_icon="🤝", layout="wide")
 st.markdown(get_css(), unsafe_allow_html=True)
 
 # ── Auth guard ────────────────────────────────────────────────
@@ -134,7 +135,9 @@ st.markdown("<br>", unsafe_allow_html=True)
 # TABS
 # ════════════════════════════════════════════════════════════
 req_tab_label = "📦 All Requests" if role == "admin" else "📦 My Requests"
-tab_browse, tab_myreq, tab_map = st.tabs(["🥬 Browse Listings", req_tab_label, "🗺️ Food Map"])
+tab_browse, tab_myreq, tab_map, tab_notifs, tab_subs = st.tabs([
+    "🥬 Browse Listings", req_tab_label, "🗺️ Food Map", "🔔 Notifications", "💳 Subscription Plans"
+])
 
 
 # ════════════════════════════════════════════════════════════
@@ -165,7 +168,7 @@ with tab_browse:
 
                     # Premium option
                     prem_key = f"prem_{lid}"
-                    is_premium = st.checkbox("⚡ Priority Pickup +$4.99", key=prem_key,
+                    is_premium = st.checkbox("⚡ Priority Pickup +₹499", key=prem_key,
                                              help="Priority matching with nearest logistics driver")
 
                     if role == "admin":
@@ -182,7 +185,7 @@ with tab_browse:
                         if st.button("🙋 Request This Food", key=f"req_{lid}", use_container_width=True):
                             request_food(lid, uid, premium=is_premium)
                             if is_premium:
-                                log_transaction(uid, 4.99, "logistics_fee", {"listing_id": lid})
+                                log_transaction(uid, 499.0, "logistics_fee", {"listing_id": lid})
                             if "claimed_ids" not in st.session_state:
                                 st.session_state.claimed_ids = set()
                             st.session_state.claimed_ids.add(lid)
@@ -301,6 +304,95 @@ with tab_map:
             ])
             if not df_map.empty:
                 st.map(df_map)
+
+# ════════════════════════════════════════════════════════════
+# TAB 4 — NOTIFICATIONS
+# ════════════════════════════════════════════════════════════
+with tab_notifs:
+    st.markdown("### 🔔 Notification Center")
+    notifs = get_user_notifications(uid)
+    
+    if not notifs:
+        st.info("No new notifications.", icon="📭")
+    else:
+        for n in notifs:
+            is_read = n.get("read", False)
+            bg_color = "rgba(52,211,153,0.1)" if not is_read else "rgba(255,255,255,0.05)"
+            icon = "🚨" if n.get("type") == "system" else "🥗"
+            time_str = str(n.get("created_at", ""))[:16]
+            
+            st.markdown(f"""
+            <div class="glass-card" style="background:{bg_color}; padding:1rem 1.5rem; margin-bottom:0.8rem; border-left: 4px solid #34D399;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div>
+                        <div style="font-weight:700; font-size:1.05rem;">{icon} {n.get('title')}</div>
+                        <div style="color:rgba(228,237,255,0.8); margin-top:0.3rem; font-size:0.9rem;">{n.get('message')}</div>
+                    </div>
+                    <div style="font-size:0.75rem; color:rgba(228,237,255,0.4);">{time_str}</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+
+# ════════════════════════════════════════════════════════════
+# TAB 5 — SUBSCRIPTIONS & RAZORPAY
+# ════════════════════════════════════════════════════════════
+with tab_subs:
+    st.markdown("### 💳 Receiver Subscription Plans")
+    st.markdown("Choose a plan to upgrade your limits and logistics options.")
+    
+    col_basic, col_pro = st.columns(2)
+    
+    with col_basic:
+        st.markdown("""
+        <div class="glass-card" style="padding:2rem; text-align:center; height:100%;">
+            <div style="font-size:1.5rem; font-weight:700; color:#fff;">Basic Plan</div>
+            <div style="font-size:2rem; font-weight:900; color:#34D399; margin:1rem 0;">Free</div>
+            <div style="text-align:left; color:rgba(228,237,255,0.7); font-size:0.9rem; line-height:1.8;">
+                ✓ Browse available listings<br>
+                ✓ Standard pickup matching<br>
+                ✓ Basic metrics<br>
+                ✗ Priority route assignment<br>
+                ✗ Dedicated support
+            </div>
+            <div style="margin-top:2rem; padding:0.6rem; border:1px solid #34D399; color:#34D399; border-radius:8px;">Current Plan</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with col_pro:
+        st.markdown("""
+        <div class="glass-card" style="padding:2rem; text-align:center; height:100%; border:1px solid #818CF8; background:rgba(99,102,241,0.05);">
+            <div style="font-size:1.5rem; font-weight:700; color:#fff;">Pro Plan</div>
+            <div style="font-size:2rem; font-weight:900; color:#818CF8; margin:1rem 0;">₹2,999 <span style="font-size:0.9rem;color:#ccc;">/ month</span></div>
+            <div style="text-align:left; color:rgba(228,237,255,0.7); font-size:0.9rem; line-height:1.8;">
+                ✓ Browse available listings<br>
+                ✓ Premium priority pickup matching<br>
+                ✓ Advanced metrics & API access<br>
+                ✓ Priority route assignment<br>
+                ✓ 24/7 dedicated support
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Razorpay Simulation (Streamlit HTML Component)
+        import streamlit.components.v1 as components
+        
+        # We simulate the Razorpay script here using a generic button for demo purposes
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🚀 Upgrade to Pro (Pay with Razorpay)", use_container_width=True, type="primary"):
+            st.session_state.show_razorpay = True
+            
+        if st.session_state.get("show_razorpay"):
+            st.info("Simulating Razorpay payment flow...")
+            # Note: For a real Razorpay integration, we'd inject their standard <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+            # and pass the order_id created by razorpay python SDK on the backend.
+            time.sleep(2)
+            log_transaction(uid, 2999.0, "subscription", {"tier": "pro"})
+            st.success("✅ Payment successful! You are now subscribed to the Pro Plan.")
+            st.balloons()
+            st.session_state.show_razorpay = False
+            time.sleep(1.5)
+            st.rerun()
 
 # ── Auto-refresh ─────────────────────────────────────────────
 if auto_ref:
