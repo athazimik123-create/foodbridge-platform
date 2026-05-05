@@ -13,6 +13,7 @@ import os
 import json
 import uuid
 from datetime import datetime, timezone, timedelta
+from typing import List, Optional
 
 import firebase_admin
 from firebase_admin import credentials, firestore, auth
@@ -162,7 +163,7 @@ def get_user(uid: str) -> dict | None:
     return _MOCK_USERS.get(uid)
 
 
-def get_all_users() -> list[dict]:
+def get_all_users() -> List[dict]:
     if db:
         docs = db.collection("users").stream()
         return [d.to_dict() for d in docs]
@@ -214,7 +215,7 @@ def create_food_listing(data: dict) -> str:
     return listing_id
 
 
-def get_available_listings(limit: int = 60) -> list[dict]:
+def get_available_listings(limit: int = 60) -> List[dict]:
     if db:
         docs = (
             db.collection("food_listings")
@@ -228,7 +229,7 @@ def get_available_listings(limit: int = 60) -> list[dict]:
     return [l for l in _MOCK_LISTINGS if l["status"] == "available"]
 
 
-def get_all_listings(limit: int = 100) -> list[dict]:
+def get_all_listings(limit: int = 100) -> List[dict]:
     if db:
         docs = db.collection("food_listings").limit(limit).stream()
         results = [d.to_dict() for d in docs]
@@ -237,7 +238,7 @@ def get_all_listings(limit: int = 100) -> list[dict]:
     return list(_MOCK_LISTINGS)
 
 
-def get_donor_listings(donor_id: str) -> list[dict]:
+def get_donor_listings(donor_id: str) -> List[dict]:
     if db:
         docs = db.collection("food_listings").where("donor_id", "==", donor_id).stream()
         results = [d.to_dict() for d in docs]
@@ -274,7 +275,7 @@ def update_listing_status(listing_id: str, status: str) -> None:
                 break
 
 
-def get_receiver_requests(receiver_id: str) -> list[dict]:
+def get_receiver_requests(receiver_id: str) -> List[dict]:
     if db:
         docs = db.collection("food_listings").where("receiver_id", "==", receiver_id).stream()
         results = [d.to_dict() for d in docs]
@@ -304,7 +305,7 @@ def log_transaction(user_id: str, amount: float, tx_type: str, meta: dict = None
     return tx_id
 
 
-def get_all_transactions(limit: int = 200) -> list[dict]:
+def get_all_transactions(limit: int = 200) -> List[dict]:
     if db:
         docs = (
             db.collection("transactions")
@@ -339,7 +340,7 @@ def save_route(route_data: dict) -> str:
     return route_id
 
 
-def get_routes(limit: int = 20) -> list[dict]:
+def get_routes(limit: int = 20) -> List[dict]:
     if db:
         docs = db.collection("routes").limit(limit).stream()
         return [d.to_dict() for d in docs]
@@ -473,7 +474,7 @@ def create_platform_notification(title: str, message: str, n_type: str, receiver
         _MOCK_NOTIFICATIONS.append(doc)
     return notif_id
 
-def get_user_notifications(receiver_id: str, limit: int = 20) -> list[dict]:
+def get_user_notifications(receiver_id: str, limit: int = 20) -> List[dict]:
     if db:
         # Fetch notifications for this receiver or "all"
         docs_all = db.collection("notifications").where("receiver_id", "in", [receiver_id, "all"]).order_by("created_at", direction=firestore.Query.DESCENDING).limit(limit).stream()
@@ -506,7 +507,7 @@ def submit_feedback(user_id: str, user_name: str, role: str, rating: int, messag
         _MOCK_FEEDBACK.append(doc)
     return fb_id
 
-def get_all_feedback(limit: int = 50) -> list[dict]:
+def get_all_feedback(limit: int = 50) -> List[dict]:
     if db:
         docs = db.collection("feedback").order_by("timestamp", direction=firestore.Query.DESCENDING).limit(limit).stream()
         return [d.to_dict() for d in docs]
