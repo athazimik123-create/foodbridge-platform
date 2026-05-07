@@ -115,6 +115,33 @@ st.markdown("<br>", unsafe_allow_html=True)
 tab_label = "📋 All Listings" if role == "admin" else "📋 My Listings"
 tab_list, tab_new, tab_map, tab_smart = st.tabs([tab_label, "➕ Add New Listing", "📍 Location Preview", "🤖 Smart Container"])
 
+# ── Priority helper ───────────────────────────────────────────
+def _get_priority(expiry_dt_str):
+    """Return (label, colour, icon) based on hours until expiry."""
+    try:
+        from datetime import timezone as _tz
+        exp = datetime.fromisoformat(str(expiry_dt_str).replace("Z", "+00:00"))
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=_tz.utc)
+        hours_left = (exp - datetime.now(_tz.utc)).total_seconds() / 3600
+        if hours_left <= 2:
+            return "High",   "#F87171", "🔴"
+        elif hours_left <= 48:
+            return "Medium", "#FB923C", "🟠"
+        else:
+            return "Low",    "#34D399", "🟢"
+    except Exception:
+        return "Low",    "#34D399", "🟢"
+
+def _priority_badge(expiry_dt_str):
+    label, colour, icon = _get_priority(expiry_dt_str)
+    return (
+        f'<span style="display:inline-block;padding:3px 12px;border-radius:20px;'
+        f'font-size:0.72rem;font-weight:700;letter-spacing:0.07em;'
+        f'background:{colour}22;color:{colour};border:1px solid {colour}55;">'
+        f'{icon} {label} Priority</span>'
+    )
+
 # ════════════════════════════════════════════════════════════
 # TAB 1 — MY LISTINGS
 # ════════════════════════════════════════════════════════════
@@ -148,6 +175,8 @@ with tab_list:
             for col, listing in zip(grid, row):
                 with col:
                     st.markdown(render_food_card(listing), unsafe_allow_html=True)
+                    # Priority badge
+                    st.markdown(_priority_badge(listing.get("expiry_dt", "")), unsafe_allow_html=True)
                     lid = listing["listing_id"]
                     status = listing["status"]
 
@@ -346,6 +375,44 @@ with tab_smart:
         is_expired = sc_freshness < sc_threshold
         status = "disposed" if is_expired else "available"
         
+        # Determine priority based on freshness in hours
+        sc_freshness_hours = sc_freshness * 24
+        if sc_freshness_hours <= 2:
+            priority_label, priority_colour, priority_icon = "High",   "#F87171", "🔴"
+        elif sc_freshness_hours <= 48:
+            priority_label, priority_colour, priority_icon = "Medium", "#FB923C", "🟠"
+        else:
+            priority_label, priority_colour, priority_icon = "Low",    "#34D399", "🟢"
+
+        # Show priority reference table
+        st.markdown("""
+        <div class="glass-card" style="margin-bottom:1rem;padding:1.2rem 1.5rem;">
+            <div style="font-size:0.95rem;font-weight:700;color:#E4EDFF;margin-bottom:0.8rem;">📊 Freshness Priority Reference</div>
+            <table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
+                <thead>
+                    <tr style="color:rgba(228,237,255,0.5);border-bottom:1px solid rgba(255,255,255,0.08);">
+                        <th style="text-align:left;padding:0.4rem 0.8rem;">Condition</th>
+                        <th style="text-align:left;padding:0.4rem 0.8rem;">Priority</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                        <td style="padding:0.5rem 0.8rem;color:rgba(228,237,255,0.8);">🔴 Expiring within 1–2 hrs</td>
+                        <td style="padding:0.5rem 0.8rem;"><span style="color:#F87171;font-weight:700;">High</span></td>
+                    </tr>
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                        <td style="padding:0.5rem 0.8rem;color:rgba(228,237,255,0.8);">🟠 Medium freshness (2–48 hrs)</td>
+                        <td style="padding:0.5rem 0.8rem;"><span style="color:#FB923C;font-weight:700;">Medium</span></td>
+                    </tr>
+                    <tr>
+                        <td style="padding:0.5rem 0.8rem;color:rgba(228,237,255,0.8);">🟢 Long shelf life (&gt;48 hrs)</td>
+                        <td style="padding:0.5rem 0.8rem;"><span style="color:#34D399;font-weight:700;">Low</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        """, unsafe_allow_html=True)
+        
         data = {
             "donor_id":     uid,
             "donor_name":   st.session_state.user_name + " (Smart Container)",
@@ -375,9 +442,20 @@ with tab_smart:
             The food has been routed to disposal. (Listing ID: `{listing_id}`)
             """)
         else:
-            st.success(f"""
-            ✅ **Food Available!**
-            The food is fresh for {sc_freshness} days. A listing has been automatically created, and nearby receivers have been notified! 
-            (Listing ID: `{listing_id}`)
-            """)
+            # Show priority result
+            st.markdown(f"""
+            <div class="glass-card" style="border-left:4px solid {priority_colour};padding:1.2rem 1.5rem;margin-bottom:1rem;">
+                <div style="font-size:1.05rem;font-weight:700;color:#E4EDFF;">
+                    {priority_icon} Container Result — 
+                    <span style="color:{priority_colour};">{priority_label} Priority</span>
+                </div>
+                <div style="color:rgba(228,237,255,0.7);margin-top:0.5rem;font-size:0.88rem;">
+                    Freshness: <b>{sc_freshness} days</b> ({sc_freshness_hours:.1f} hrs) &nbsp;|&nbsp;
+                    Fill Level: <b>{sc_qty} kg</b> &nbsp;|&nbsp;
+                    Status: <b style="color:#34D399;">Available</b>
+                </div>
+                <div style="color:rgba(228,237,255,0.5);margin-top:0.4rem;font-size:0.8rem;">Listing ID: {listing_id}</div>
+            </div>
+            """, unsafe_allow_html=True)
+            st.success("✅ **Food Available!** A listing has been automatically created and nearby receivers have been notified!")
             st.balloons()
