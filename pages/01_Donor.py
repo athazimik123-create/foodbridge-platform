@@ -319,7 +319,7 @@ with tab_new:
                 "Morning (6am–12pm)", "Afternoon (12pm–5pm)", "Evening (5pm–9pm)", "Flexible (Anytime)"
             ])
             expiry_hrs = st.slider("Food Safe For (hours)", 1, 72, 8)
-            premium    = st.checkbox("⚡ Enable Priority Pickup (+$4.99 platform fee)",
+            premium    = st.checkbox("⚡ Enable Priority Pickup (+₹4.99 platform fee)",
                                      help="Logistics partners prioritize premium pickups")
 
         description = st.text_area("Description", placeholder="Add details about quantity, condition, packaging, etc.", height=90)
