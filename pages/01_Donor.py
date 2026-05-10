@@ -15,7 +15,8 @@ from datetime import datetime, timezone, timedelta
 
 from firebase_config import (
     create_food_listing, get_donor_listings, get_all_listings,
-    update_listing_status, log_transaction, GOOGLE_MAPS_API_KEY
+    update_listing_status, update_food_listing, delete_food_listing,
+    log_transaction, GOOGLE_MAPS_API_KEY
 )
 from styles import get_css, render_food_card, render_kpi
 
@@ -177,15 +178,98 @@ with tab_list:
                     st.markdown(render_food_card(listing), unsafe_allow_html=True)
                     # Priority badge
                     st.markdown(_priority_badge(listing.get("expiry_dt", "")), unsafe_allow_html=True)
-                    lid = listing["listing_id"]
+                    lid    = listing["listing_id"]
                     status = listing["status"]
 
+                    # ── Action buttons ────────────────────────
                     if status == "available":
-                        if st.button("🗑️ Remove Listing", key=f"del_{lid}", use_container_width=True):
-                            update_listing_status(lid, "delivered")  # soft delete → mark delivered
-                            st.toast("Listing removed.", icon="✅")
-                            time.sleep(0.8)
-                            st.rerun()
+                        btn_col1, btn_col2 = st.columns(2)
+                        with btn_col1:
+                            if st.button("✏️ Edit", key=f"edit_btn_{lid}", use_container_width=True):
+                                st.session_state[f"editing_{lid}"] = not st.session_state.get(f"editing_{lid}", False)
+                                st.session_state[f"confirming_delete_{lid}"] = False
+                        with btn_col2:
+                            if st.button("🗑️ Delete", key=f"del_btn_{lid}", use_container_width=True):
+                                st.session_state[f"confirming_delete_{lid}"] = not st.session_state.get(f"confirming_delete_{lid}", False)
+                                st.session_state[f"editing_{lid}"] = False
+
+                        # ── Delete confirmation ───────────────
+                        if st.session_state.get(f"confirming_delete_{lid}", False):
+                            st.warning("⚠️ This will permanently delete the listing. Are you sure?")
+                            conf_col1, conf_col2 = st.columns(2)
+                            with conf_col1:
+                                if st.button("✅ Yes, Delete", key=f"confirm_del_{lid}", use_container_width=True):
+                                    delete_food_listing(lid)
+                                    st.session_state.pop(f"confirming_delete_{lid}", None)
+                                    st.toast("Listing permanently deleted.", icon="🗑️")
+                                    time.sleep(0.6)
+                                    st.rerun()
+                            with conf_col2:
+                                if st.button("✖ Cancel", key=f"cancel_del_{lid}", use_container_width=True):
+                                    st.session_state[f"confirming_delete_{lid}"] = False
+                                    st.rerun()
+
+                        # ── Inline edit form ──────────────────
+                        if st.session_state.get(f"editing_{lid}", False):
+                            with st.expander("✏️ Edit Listing", expanded=True):
+                                with st.form(key=f"edit_form_{lid}"):
+                                    e_food_name = st.text_input(
+                                        "Food Name", value=listing.get("food_name", ""))
+                                    e_food_type = st.selectbox(
+                                        "Food Type",
+                                        ["Bakery", "Prepared Meals", "Produce", "Dairy",
+                                         "Seafood", "Grains", "Fruits", "Snacks", "Mixed"],
+                                        index=["Bakery", "Prepared Meals", "Produce", "Dairy",
+                                               "Seafood", "Grains", "Fruits", "Snacks", "Mixed"
+                                               ].index(listing.get("food_type", "Mixed"))
+                                        if listing.get("food_type") in
+                                           ["Bakery", "Prepared Meals", "Produce", "Dairy",
+                                            "Seafood", "Grains", "Fruits", "Snacks", "Mixed"] else 8
+                                    )
+                                    e_qty = st.number_input(
+                                        "Quantity (kg)", min_value=0.1, max_value=5000.0,
+                                        value=float(listing.get("quantity_kg", 1.0)), step=0.5)
+                                    e_servings = st.number_input(
+                                        "Estimated Servings", min_value=1, max_value=10000,
+                                        value=int(listing.get("servings", 1)))
+                                    e_address = st.text_input(
+                                        "Pickup Address", value=listing.get("address", ""))
+                                    e_pickup_win = st.selectbox(
+                                        "Pickup Window",
+                                        ["Morning (6am–12pm)", "Afternoon (12pm–5pm)",
+                                         "Evening (5pm–9pm)", "Flexible (Anytime)"],
+                                        index=0)
+                                    e_desc = st.text_area(
+                                        "Description", value=listing.get("description", ""), height=80)
+                                    e_tags_str = st.text_input(
+                                        "Tags (comma-separated)",
+                                        value=", ".join(listing.get("tags", [])))
+                                    e_expiry_hrs = st.slider(
+                                        "Extend Food Safe For (hours from now)", 1, 72, 8)
+
+                                    save_btn = st.form_submit_button("💾 Save Changes", use_container_width=True)
+
+                                if save_btn:
+                                    if not e_food_name or not e_address:
+                                        st.error("Food Name and Pickup Address are required.")
+                                    else:
+                                        new_expiry = (datetime.now(timezone.utc) + timedelta(hours=e_expiry_hrs)).isoformat()
+                                        update_food_listing(lid, {
+                                            "food_name":     e_food_name,
+                                            "food_type":     e_food_type,
+                                            "quantity_kg":   e_qty,
+                                            "servings":      e_servings,
+                                            "address":       e_address,
+                                            "pickup_window": e_pickup_win,
+                                            "description":   e_desc,
+                                            "tags":          [t.strip() for t in e_tags_str.split(",") if t.strip()],
+                                            "expiry_dt":     new_expiry,
+                                        })
+                                        st.session_state[f"editing_{lid}"] = False
+                                        st.toast("✅ Listing updated!", icon="✏️")
+                                        time.sleep(0.6)
+                                        st.rerun()
+
                     elif status == "requested":
                         if st.button("✅ Confirm Handover", key=f"hov_{lid}", use_container_width=True):
                             update_listing_status(lid, "in_transit")
@@ -193,7 +277,7 @@ with tab_list:
                             time.sleep(0.8)
                             st.rerun()
                     elif status == "in_transit":
-                        if st.button("🏁 Mark Delivered", key=f"del_{lid}", use_container_width=True):
+                        if st.button("🏁 Mark Delivered", key=f"mark_del_{lid}", use_container_width=True):
                             update_listing_status(lid, "delivered")
                             st.toast("Marked as delivered! Great work 🎉", icon="🍱")
                             time.sleep(0.8)

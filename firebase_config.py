@@ -275,7 +275,29 @@ def update_listing_status(listing_id: str, status: str) -> None:
                 break
 
 
+def update_food_listing(listing_id: str, fields: dict) -> None:
+    """Patch editable fields on a food listing (donor corrections)."""
+    fields["updated_at"] = datetime.now(timezone.utc)
+    if db:
+        db.collection("food_listings").document(listing_id).update(fields)
+    else:
+        for l in _MOCK_LISTINGS:
+            if l["listing_id"] == listing_id:
+                l.update(fields)
+                break
+
+
+def delete_food_listing(listing_id: str) -> None:
+    """Hard-delete a food listing from Firestore (or mock store)."""
+    if db:
+        db.collection("food_listings").document(listing_id).delete()
+    else:
+        global _MOCK_LISTINGS
+        _MOCK_LISTINGS = [l for l in _MOCK_LISTINGS if l["listing_id"] != listing_id]
+
+
 def get_receiver_requests(receiver_id: str) -> List[dict]:
+
     if db:
         docs = db.collection("food_listings").where("receiver_id", "==", receiver_id).stream()
         results = [d.to_dict() for d in docs]

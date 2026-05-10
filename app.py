@@ -105,6 +105,8 @@ def render_login():
     <style>
     @keyframes rise { 0%{transform:translateY(0) rotate(0);opacity:.5} 100%{transform:translateY(-100vh) rotate(540deg);opacity:0} }
     .pt { position:fixed; border-radius:50%; pointer-events:none; z-index:0; background:rgba(52,211,153,0.1); animation:rise linear infinite; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+    .login-panel { animation: fadeIn 0.35s ease; }
     </style>
     <div class="pt" style="width:7px;height:7px;left:12%;bottom:-20px;animation-duration:17s;"></div>
     <div class="pt" style="width:4px;height:4px;left:33%;bottom:-20px;animation-duration:21s;animation-delay:4s;"></div>
@@ -113,125 +115,157 @@ def render_login():
     <div class="pt" style="width:6px;height:6px;left:90%;bottom:-20px;animation-duration:23s;animation-delay:6s;background:rgba(99,102,241,0.12);"></div>
     """, unsafe_allow_html=True)
 
+    # Initialise show-form toggle
+    if "show_login_form" not in st.session_state:
+        st.session_state.show_login_form = False
+
     _, col, _ = st.columns([1, 1.3, 1])
     with col:
-        # Hero
+        # ── Hero section ────────────────────────────────────────
         st.markdown("""
-        <div style="text-align:center;padding:2.5rem 0 2rem;">
+        <div style="text-align:center;padding:2.5rem 0 1.8rem;">
             <div style="font-size:3.5rem;filter:drop-shadow(0 0 18px rgba(52,211,153,0.6));">🌉</div>
             <div style="font-size:2.2rem;font-weight:900;font-family:'Space Grotesk',sans-serif;
                         background:linear-gradient(135deg,#34D399,#6366F1);
                         -webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-top:0.4rem;">
                 FoodBridge
             </div>
-            <div style="font-size:0.9rem;color:rgba(228,237,255,0.5);margin-top:0.5rem;line-height:1.5;">
+            <div style="font-size:0.9rem;color:rgba(228,237,255,0.5);margin-top:0.5rem;line-height:1.6;">
                 Connecting surplus food with communities who need it.<br>
                 <span style="color:#34D399;font-weight:600;">Zero waste. Real impact.</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
 
-        # Demo mode banner
-        if IS_MOCK:
-            st.markdown("""
-            <div style="background:rgba(52,211,153,0.07);border:1px solid rgba(52,211,153,0.2);
-                        border-radius:12px;padding:0.85rem 1rem;margin-bottom:1.2rem;
-                        font-size:0.82rem;color:rgba(228,237,255,0.7);">
-                🔑 <b style="color:#34D399;">Demo Mode</b> — Password: <code>demo1234</code><br>
-                <code>admin@foodbridge.com</code> &nbsp;·&nbsp;
-                <code>donor@foodbridge.com</code> &nbsp;·&nbsp;
-                <code>receiver@foodbridge.com</code>
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.markdown("""
-            <div style="background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.2);
-                        border-radius:12px;padding:0.85rem 1rem;margin-bottom:1.2rem;
-                        font-size:0.82rem;color:rgba(228,237,255,0.7);">
-                🔥 <b style="color:#818CF8;">Live Mode</b> — Connected to Firebase. Sign in or register below.
-            </div>
-            """, unsafe_allow_html=True)
-
-        tab_in, tab_up = st.tabs(["🔐 Direct Login", "✨ Register"])
-
-        # ── DIRECT LOGIN ───────────────────────────────────────────
-        with tab_in:
-            with st.form("signin_form", clear_on_submit=False):
-                email = st.text_input("Email", placeholder="you@example.com", key="si_email")
-                pw    = st.text_input("Password", type="password", placeholder="••••••••", key="si_pw")
-                submitted = st.form_submit_button("Direct Login →", use_container_width=True)
-
-            if submitted:
-                if not email or not pw:
-                    st.error("Please enter email and password.")
-                else:
-                    with st.spinner("Authenticating…"):
-                        res = sign_in(email, pw)
-                    if "error" in res:
-                        st.error(f"❌ {res['error']}")
-                        if any(x in res["error"] for x in ["INVALID", "EMAIL_NOT_FOUND"]):
-                            st.info("💡 No account? Switch to the **✨ Register** tab.", icon="ℹ️")
-                    else:
-                        st.session_state.authenticated = True
-                        st.session_state.id_token  = res.get("idToken")
-                        st.session_state.uid       = res.get("localId")
-                        st.session_state.user_role = res.get("role", "receiver")
-                        st.session_state.user_name = res.get("name", email.split("@")[0])
-                        st.session_state.user_email = email
-                        st.success(f"Welcome, {st.session_state.user_name}! 🎉")
-                        st.rerun()
-
-        # ── REGISTER ─────────────────────────────────────────
-        with tab_up:
-            if IS_MOCK:
-                st.info("Account creation requires a real Firebase project.", icon="🔒")
-            else:
-                with st.form("register_form", clear_on_submit=True):
-                    r_name  = st.text_input("Full Name", key="r_name")
-                    r_email = st.text_input("Email", key="r_email")
-                    r_role  = st.selectbox("I am a…", options=["donor","receiver"],
-                                           format_func=lambda x: {"donor":"🍽️ Donor","receiver":"🤝 Receiver (NGO/Individual)"}[x])
-                    r_pw   = st.text_input("Password (min 6 chars)", type="password", key="r_pw")
-                    r_pw2  = st.text_input("Confirm Password", type="password", key="r_pw2")
-                    r_sub  = st.form_submit_button("Create Account →", use_container_width=True)
-
-                if r_sub:
-                    if not all([r_name, r_email, r_pw, r_pw2]):
-                        st.error("All fields are required.")
-                    elif r_pw != r_pw2:
-                        st.error("Passwords do not match.")
-                    elif len(r_pw) < 6:
-                        st.error("Password must be at least 6 characters.")
-                    else:
-                        with st.spinner("Creating account…"):
-                            res = sign_up(r_email, r_pw, r_name, r_role)
-                        if "error" in res:
-                            st.error(f"❌ {res['error']}")
-                        else:
-                            st.session_state.authenticated = True
-                            st.session_state.id_token  = res.get("idToken")
-                            st.session_state.uid       = res.get("localId")
-                            st.session_state.user_role = r_role
-                            st.session_state.user_name = r_name
-                            st.session_state.user_email = r_email
-                            st.success(f"🎉 Welcome to FoodBridge, {r_name}!")
-                            st.rerun()
-
-        # Feature tiles
-        st.markdown("<br>", unsafe_allow_html=True)
+        # ── Feature tiles ────────────────────────────────────────
         f1, f2, f3 = st.columns(3)
         tiles = [
             ("🍽️", "#34D399", "Donate Food", "List surplus food instantly"),
             ("🤝", "#6366F1", "Receive Food", "NGOs & individuals request"),
             ("🗺️", "#FB923C", "Route Optimize", "AI-powered delivery routes"),
         ]
-        for col, (em, color, title, sub) in zip([f1, f2, f3], tiles):
-            with col:
-                col.markdown(f"""<div class="glass-card" style="text-align:center;padding:1rem;">
+        for fcol, (em, color, title, sub) in zip([f1, f2, f3], tiles):
+            with fcol:
+                fcol.markdown(f"""<div class="glass-card" style="text-align:center;padding:1rem;">
                     <div style="font-size:1.6rem;">{em}</div>
                     <div style="font-size:0.75rem;font-weight:700;color:{color};margin-top:0.4rem;">{title}</div>
                     <div style="font-size:0.68rem;color:rgba(228,237,255,0.4);margin-top:0.2rem;">{sub}</div>
                 </div>""", unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # ── Login button (CTA) ───────────────────────────────────
+        if not st.session_state.show_login_form:
+            btn_label = "🔐 Sign In to FoodBridge"
+            if st.button(btn_label, use_container_width=True, key="open_login_btn"):
+                st.session_state.show_login_form = True
+                st.rerun()
+
+            st.markdown("""
+            <div style="text-align:center;font-size:0.75rem;color:rgba(228,237,255,0.3);margin-top:0.6rem;">
+                New here? Click Sign In → Register tab to create a free account.
+            </div>
+            """, unsafe_allow_html=True)
+
+        # ── Login / Register panel (shown after button click) ───
+        if st.session_state.show_login_form:
+            st.markdown('<div class="login-panel">', unsafe_allow_html=True)
+
+            # Demo / Live mode banner
+            if IS_MOCK:
+                st.markdown("""
+                <div style="background:rgba(52,211,153,0.07);border:1px solid rgba(52,211,153,0.2);
+                            border-radius:12px;padding:0.85rem 1rem;margin-bottom:1.2rem;
+                            font-size:0.82rem;color:rgba(228,237,255,0.7);">
+                    🔑 <b style="color:#34D399;">Demo Mode</b> — Password: <code>demo1234</code><br>
+                    <code>admin@foodbridge.com</code> &nbsp;·&nbsp;
+                    <code>donor@foodbridge.com</code> &nbsp;·&nbsp;
+                    <code>receiver@foodbridge.com</code>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown("""
+                <div style="background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.2);
+                            border-radius:12px;padding:0.85rem 1rem;margin-bottom:1.2rem;
+                            font-size:0.82rem;color:rgba(228,237,255,0.7);">
+                    🔥 <b style="color:#818CF8;">Live Mode</b> — Connected to Firebase.
+                </div>
+                """, unsafe_allow_html=True)
+
+            tab_in, tab_up = st.tabs(["🔐 Sign In", "✨ Register"])
+
+            # ── SIGN IN ──────────────────────────────────────────
+            with tab_in:
+                with st.form("signin_form", clear_on_submit=False):
+                    email = st.text_input("Email", placeholder="you@example.com", key="si_email")
+                    pw    = st.text_input("Password", type="password", placeholder="••••••••", key="si_pw")
+                    submitted = st.form_submit_button("Sign In →", use_container_width=True)
+
+                if submitted:
+                    if not email or not pw:
+                        st.error("Please enter email and password.")
+                    else:
+                        with st.spinner("Authenticating…"):
+                            res = sign_in(email, pw)
+                        if "error" in res:
+                            st.error(f"❌ {res['error']}")
+                            if any(x in res["error"] for x in ["INVALID", "EMAIL_NOT_FOUND"]):
+                                st.info("💡 No account? Switch to the **✨ Register** tab.", icon="ℹ️")
+                        else:
+                            st.session_state.authenticated = True
+                            st.session_state.id_token   = res.get("idToken")
+                            st.session_state.uid        = res.get("localId")
+                            st.session_state.user_role  = res.get("role", "receiver")
+                            st.session_state.user_name  = res.get("name", email.split("@")[0])
+                            st.session_state.user_email = email
+                            st.session_state.show_login_form = False
+                            st.success(f"Welcome, {st.session_state.user_name}! 🎉")
+                            st.rerun()
+
+            # ── REGISTER ─────────────────────────────────────────
+            with tab_up:
+                if IS_MOCK:
+                    st.info("Account creation requires a real Firebase project.", icon="🔒")
+                else:
+                    with st.form("register_form", clear_on_submit=True):
+                        r_name  = st.text_input("Full Name", key="r_name")
+                        r_email = st.text_input("Email", key="r_email")
+                        r_role  = st.selectbox("I am a…", options=["donor", "receiver"],
+                                               format_func=lambda x: {"donor": "🍽️ Donor", "receiver": "🤝 Receiver (NGO/Individual)"}[x])
+                        r_pw   = st.text_input("Password (min 6 chars)", type="password", key="r_pw")
+                        r_pw2  = st.text_input("Confirm Password", type="password", key="r_pw2")
+                        r_sub  = st.form_submit_button("Create Account →", use_container_width=True)
+
+                    if r_sub:
+                        if not all([r_name, r_email, r_pw, r_pw2]):
+                            st.error("All fields are required.")
+                        elif r_pw != r_pw2:
+                            st.error("Passwords do not match.")
+                        elif len(r_pw) < 6:
+                            st.error("Password must be at least 6 characters.")
+                        else:
+                            with st.spinner("Creating account…"):
+                                res = sign_up(r_email, r_pw, r_name, r_role)
+                            if "error" in res:
+                                st.error(f"❌ {res['error']}")
+                            else:
+                                st.session_state.authenticated = True
+                                st.session_state.id_token   = res.get("idToken")
+                                st.session_state.uid        = res.get("localId")
+                                st.session_state.user_role  = r_role
+                                st.session_state.user_name  = r_name
+                                st.session_state.user_email = r_email
+                                st.session_state.show_login_form = False
+                                st.success(f"🎉 Welcome to FoodBridge, {r_name}!")
+                                st.rerun()
+
+            # Back link
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("← Back", key="hide_login_btn", use_container_width=False):
+                st.session_state.show_login_form = False
+                st.rerun()
+
+            st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ════════════════════════════════════════════════════════════
