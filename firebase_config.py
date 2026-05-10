@@ -557,11 +557,11 @@ def create_platform_notification(title: str, message: str, n_type: str, receiver
 
 def get_user_notifications(receiver_id: str, limit: int = 20) -> List[dict]:
     if db:
-        # Fetch notifications for this receiver or "all"
-        docs_all = db.collection("notifications").where("receiver_id", "in", [receiver_id, "all"]).order_by("created_at", direction=firestore.Query.DESCENDING).limit(limit).stream()
+        # Fetch notifications for this receiver or "all", avoiding composite index
+        docs_all = db.collection("notifications").where("receiver_id", "in", [receiver_id, "all"]).stream()
         res = [d.to_dict() for d in docs_all]
-        res.sort(key=lambda x: x.get("created_at") or "", reverse=True)
-        return res
+        res.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
+        return res[:limit]
     
     # Mock fallback
     notifs = [n for n in _MOCK_NOTIFICATIONS if n.get("receiver_id") in (receiver_id, "all")]
