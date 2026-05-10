@@ -296,6 +296,65 @@ def delete_food_listing(listing_id: str) -> None:
         _MOCK_LISTINGS = [l for l in _MOCK_LISTINGS if l["listing_id"] != listing_id]
 
 
+def archive_food_listing(listing_id: str) -> None:
+    """Soft-delete: move listing to 'archived' status, preserving previous status for restore."""
+    if db:
+        doc = db.collection("food_listings").document(listing_id).get()
+        if doc.exists:
+            prev = doc.to_dict().get("status", "delivered")
+            db.collection("food_listings").document(listing_id).update({
+                "status":          "archived",
+                "pre_archive_status": prev,
+                "archived_at":     datetime.now(timezone.utc),
+            })
+    else:
+        for l in _MOCK_LISTINGS:
+            if l["listing_id"] == listing_id:
+                l["pre_archive_status"] = l.get("status", "delivered")
+                l["status"] = "archived"
+                l["archived_at"] = datetime.now(timezone.utc)
+                break
+
+
+def get_archived_listings(limit: int = 200) -> List[dict]:
+    """Fetch all archived listings (status == 'archived')."""
+    if db:
+        docs = (
+            db.collection("food_listings")
+            .where("status", "==", "archived")
+            .limit(limit)
+            .stream()
+        )
+        results = [d.to_dict() for d in docs]
+        results.sort(key=lambda x: x.get("archived_at") or "", reverse=True)
+        return results
+    return sorted(
+        [l for l in _MOCK_LISTINGS if l.get("status") == "archived"],
+        key=lambda x: x.get("archived_at") or "",
+        reverse=True,
+    )
+
+
+def restore_archived_listing(listing_id: str) -> None:
+    """Restore an archived listing back to its pre-archive status."""
+    if db:
+        doc = db.collection("food_listings").document(listing_id).get()
+        if doc.exists:
+            prev = doc.to_dict().get("pre_archive_status", "delivered")
+            db.collection("food_listings").document(listing_id).update({
+                "status":             prev,
+                "pre_archive_status": firestore.DELETE_FIELD,
+                "archived_at":        firestore.DELETE_FIELD,
+                "restored_at":        datetime.now(timezone.utc),
+            })
+    else:
+        for l in _MOCK_LISTINGS:
+            if l["listing_id"] == listing_id:
+                l["status"] = l.pop("pre_archive_status", "delivered")
+                l.pop("archived_at", None)
+                break
+
+
 def get_receiver_requests(receiver_id: str) -> List[dict]:
 
     if db:

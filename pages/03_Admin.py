@@ -20,6 +20,7 @@ from firebase_config import (
     get_all_listings, get_all_users,
     get_all_transactions, get_platform_stats,
     update_listing_status, delete_food_listing,
+    archive_food_listing, get_archived_listings, restore_archived_listing,
     get_all_feedback
 )
 from styles import get_css, render_kpi
@@ -99,8 +100,8 @@ st.markdown("<br>", unsafe_allow_html=True)
 # ════════════════════════════════════════════════════════════
 # TABS
 # ════════════════════════════════════════════════════════════
-tab_overview, tab_listings, tab_users, tab_revenue, tab_impact, tab_feedback = st.tabs([
-    "📊 Overview", "🥬 Listings", "👥 Users", "💰 Revenue", "🌱 Impact", "💬 Feedback"
+tab_overview, tab_listings, tab_users, tab_revenue, tab_impact, tab_archive, tab_feedback = st.tabs([
+    "📊 Overview", "🥬 Listings", "👥 Users", "💰 Revenue", "🌱 Impact", "🗂️ Archive", "💬 Feedback"
 ])
 
 
@@ -249,57 +250,58 @@ with tab_listings:
             else:
                 st.error("No listing found with that ID prefix.")
 
-    # ── Cleanup: completed listings ───────────────────────────
+    # ── Cleanup: archive completed listings ───────────────────
     st.markdown("<hr>", unsafe_allow_html=True)
     completed = [l for l in listings if l.get("status") in ("delivered", "disposed")]
 
     st.markdown(f"""
     <div style="display:flex;align-items:center;gap:0.8rem;margin-bottom:0.6rem;">
-        <div style="font-size:1rem;font-weight:700;color:#E4EDFF;">🗑️ Cleanup Completed Listings</div>
-        <span style="background:rgba(248,113,113,0.15);color:#F87171;border:1px solid rgba(248,113,113,0.3);
+        <div style="font-size:1rem;font-weight:700;color:#E4EDFF;">🗂️ Archive Completed Listings</div>
+        <span style="background:rgba(251,146,60,0.15);color:#FB923C;border:1px solid rgba(251,146,60,0.3);
                      padding:2px 10px;border-radius:20px;font-size:0.78rem;font-weight:700;">
             {len(completed)} records
         </span>
     </div>
     <div style="font-size:0.82rem;color:rgba(228,237,255,0.45);margin-bottom:1rem;">
-        Delivered &amp; disposed listings pile up over time. Remove old records to keep the platform clean.
+        Archiving moves listings to the <b style="color:#FB923C;">🗂️ Archive</b> tab where they can be
+        <b style="color:#34D399;">restored</b> if needed, or permanently deleted when you're certain.
     </div>
     """, unsafe_allow_html=True)
 
     if not completed:
-        st.success("✅ No completed listings to clean up — list is tidy!", icon="🧹")
+        st.success("✅ No completed listings to archive — list is tidy!", icon="🧹")
     else:
-        # Bulk delete all
-        if not st.session_state.get("confirm_bulk_delete", False):
-            if st.button("🗑️ Delete ALL Completed Listings", key="bulk_del_btn", type="primary"):
-                st.session_state["confirm_bulk_delete"] = True
+        # Bulk archive all
+        if not st.session_state.get("confirm_bulk_archive", False):
+            if st.button("🗂️ Archive ALL Completed Listings", key="bulk_arc_btn", type="primary"):
+                st.session_state["confirm_bulk_archive"] = True
                 st.rerun()
         else:
-            st.warning(f"⚠️ This will permanently delete all **{len(completed)}** completed listings. Are you sure?")
+            st.warning(f"⚠️ Archive all **{len(completed)}** completed listings? They can be restored from the 🗂️ Archive tab.")
             bc1, bc2 = st.columns(2)
             with bc1:
-                if st.button("✅ Yes, Delete All", key="confirm_bulk_yes", use_container_width=True):
+                if st.button("✅ Yes, Archive All", key="confirm_bulk_arc_yes", use_container_width=True):
                     for l in completed:
-                        delete_food_listing(l["listing_id"])
-                    st.session_state["confirm_bulk_delete"] = False
-                    st.toast(f"🗑️ Deleted {len(completed)} completed listings.", icon="✅")
+                        archive_food_listing(l["listing_id"])
+                    st.session_state["confirm_bulk_archive"] = False
+                    st.toast(f"🗂️ Archived {len(completed)} listings.", icon="✅")
                     st.rerun()
             with bc2:
-                if st.button("✖ Cancel", key="confirm_bulk_no", use_container_width=True):
-                    st.session_state["confirm_bulk_delete"] = False
+                if st.button("✖ Cancel", key="confirm_bulk_arc_no", use_container_width=True):
+                    st.session_state["confirm_bulk_archive"] = False
                     st.rerun()
 
         st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown(f"**Or delete individual listings below ({len(completed)} total):**")
+        st.markdown(f"**Or archive individual listings below ({len(completed)} total):**")
 
-        # Per-listing delete rows
+        # Per-listing archive rows
         for listing in completed:
-            lid  = listing["listing_id"]
-            name = listing.get("food_name", "Unknown")
+            lid   = listing["listing_id"]
+            name  = listing.get("food_name", "Unknown")
             donor = listing.get("donor_name", "—")
-            qty  = listing.get("quantity_kg", 0)
-            stat = listing.get("status", "")
-            addr = listing.get("address", "")[:40]
+            qty   = listing.get("quantity_kg", 0)
+            stat  = listing.get("status", "")
+            addr  = listing.get("address", "")[:40]
             created = str(listing.get("created_at", ""))[:16]
             stat_color = "#34D399" if stat == "delivered" else "#F87171"
 
@@ -324,10 +326,10 @@ with tab_listings:
                 """, unsafe_allow_html=True)
             with row_right:
                 st.markdown("<div style='height:0.6rem'></div>", unsafe_allow_html=True)
-                if st.button("🗑️", key=f"admin_del_{lid}", use_container_width=True,
-                             help=f"Delete '{name}'"):
-                    delete_food_listing(lid)
-                    st.toast(f"Deleted: {name}", icon="🗑️")
+                if st.button("🗂️", key=f"admin_arc_{lid}", use_container_width=True,
+                             help=f"Archive '{name}'"):
+                    archive_food_listing(lid)
+                    st.toast(f"Archived: {name}", icon="🗂️")
                     st.rerun()
 
 
@@ -479,7 +481,134 @@ with tab_impact:
 
 
 # ════════════════════════════════════════════════════════════
-# TAB 6 — FEEDBACK
+# TAB 6 — ARCHIVE
+# ════════════════════════════════════════════════════════════
+with tab_archive:
+    archived = get_archived_listings()
+
+    st.markdown(f"""
+    <div style="display:flex;align-items:center;gap:0.8rem;margin-bottom:0.3rem;">
+        <div class="section-title" style="font-size:1.1rem;">🗂️ Archived Listings</div>
+        <span style="background:rgba(251,146,60,0.15);color:#FB923C;border:1px solid rgba(251,146,60,0.3);
+                     padding:2px 12px;border-radius:20px;font-size:0.8rem;font-weight:700;">
+            {len(archived)} archived
+        </span>
+    </div>
+    <div class="section-sub" style="margin-bottom:1.2rem;">
+        Archived listings are hidden from the platform but safely stored here.
+        Restore them to make them active again, or permanently delete when certain.
+    </div>
+    """, unsafe_allow_html=True)
+
+    if not archived:
+        st.markdown("""
+        <div class="glass-card" style="text-align:center;padding:3rem;">
+            <div style="font-size:2.5rem;">🗂️</div>
+            <div style="font-weight:600;color:#FB923C;margin-top:0.8rem;">Archive is empty</div>
+            <div style="font-size:0.85rem;color:rgba(228,237,255,0.4);margin-top:0.4rem;">
+                Archive completed listings from the 🥬 Listings tab to see them here.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        # Bulk actions row
+        bulk_c1, bulk_c2, bulk_c3 = st.columns([2, 2, 3])
+        with bulk_c1:
+            if not st.session_state.get("confirm_restore_all", False):
+                if st.button("↩️ Restore ALL", key="restore_all_btn", use_container_width=True):
+                    st.session_state["confirm_restore_all"] = True
+                    st.rerun()
+            else:
+                st.warning(f"Restore all **{len(archived)}** listings?")
+                ra1, ra2 = st.columns(2)
+                with ra1:
+                    if st.button("✅ Yes", key="restore_all_yes", use_container_width=True):
+                        for a in archived:
+                            restore_archived_listing(a["listing_id"])
+                        st.session_state["confirm_restore_all"] = False
+                        st.toast(f"↩️ Restored {len(archived)} listings!", icon="✅")
+                        st.rerun()
+                with ra2:
+                    if st.button("✖ No", key="restore_all_no", use_container_width=True):
+                        st.session_state["confirm_restore_all"] = False
+                        st.rerun()
+        with bulk_c2:
+            if not st.session_state.get("confirm_purge_all", False):
+                if st.button("🗑️ Purge ALL Archived", key="purge_all_btn", use_container_width=True):
+                    st.session_state["confirm_purge_all"] = True
+                    st.rerun()
+            else:
+                st.error(f"⚠️ Permanently delete **{len(archived)}** archived listings? This cannot be undone.")
+                pa1, pa2 = st.columns(2)
+                with pa1:
+                    if st.button("✅ Yes, Purge", key="purge_all_yes", use_container_width=True):
+                        for a in archived:
+                            delete_food_listing(a["listing_id"])
+                        st.session_state["confirm_purge_all"] = False
+                        st.toast(f"🗑️ Purged {len(archived)} listings.", icon="✅")
+                        st.rerun()
+                with pa2:
+                    if st.button("✖ No", key="purge_all_no", use_container_width=True):
+                        st.session_state["confirm_purge_all"] = False
+                        st.rerun()
+        with bulk_c3:
+            st.markdown("""
+            <div style="font-size:0.75rem;color:rgba(228,237,255,0.35);padding-top:0.5rem;">
+                ↩️ Restore puts listings back to their previous status (delivered/disposed).<br>
+                🗑️ Purge permanently removes them from the database.
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("<hr>", unsafe_allow_html=True)
+
+        # Per-archived-listing rows
+        for listing in archived:
+            lid   = listing["listing_id"]
+            name  = listing.get("food_name", "Unknown")
+            donor = listing.get("donor_name", "—")
+            qty   = listing.get("quantity_kg", 0)
+            prev_stat  = listing.get("pre_archive_status", "delivered")
+            addr  = listing.get("address", "")[:40]
+            arc_time   = str(listing.get("archived_at", ""))[:16]
+            prev_color = "#34D399" if prev_stat == "delivered" else "#F87171"
+
+            row_info, row_restore, row_purge = st.columns([5, 1, 1])
+            with row_info:
+                st.markdown(f"""
+                <div class="glass-card" style="padding:0.75rem 1rem;margin-bottom:0.3rem;
+                             border-left:3px solid #FB923C;
+                             display:flex;flex-wrap:wrap;gap:0.5rem 1.5rem;align-items:center;">
+                    <div>
+                        <div style="font-weight:700;font-size:0.9rem;color:#E4EDFF;">{name}</div>
+                        <div style="font-size:0.75rem;color:rgba(228,237,255,0.4);">📍 {addr}</div>
+                    </div>
+                    <div style="font-size:0.78rem;color:rgba(228,237,255,0.55);">👤 {donor}</div>
+                    <div style="font-size:0.78rem;color:rgba(228,237,255,0.55);">⚖️ {qty} kg</div>
+                    <div style="font-size:0.75rem;color:rgba(228,237,255,0.35);">🗂️ Archived: {arc_time}</div>
+                    <span style="background:{prev_color}22;color:{prev_color};border:1px solid {prev_color}55;
+                                 padding:2px 8px;border-radius:20px;font-size:0.7rem;font-weight:700;">
+                        was {prev_stat.upper()}
+                    </span>
+                </div>
+                """, unsafe_allow_html=True)
+            with row_restore:
+                st.markdown("<div style='height:0.55rem'></div>", unsafe_allow_html=True)
+                if st.button("↩️", key=f"restore_{lid}", use_container_width=True,
+                             help=f"Restore '{name}'"):
+                    restore_archived_listing(lid)
+                    st.toast(f"Restored: {name}", icon="↩️")
+                    st.rerun()
+            with row_purge:
+                st.markdown("<div style='height:0.55rem'></div>", unsafe_allow_html=True)
+                if st.button("🗑️", key=f"purge_{lid}", use_container_width=True,
+                             help=f"Permanently delete '{name}'"):
+                    delete_food_listing(lid)
+                    st.toast(f"Purged: {name}", icon="🗑️")
+                    st.rerun()
+
+
+# ════════════════════════════════════════════════════════════
+# TAB 7 — FEEDBACK
 # ════════════════════════════════════════════════════════════
 with tab_feedback:
     st.markdown("### 💬 User Feedback")
