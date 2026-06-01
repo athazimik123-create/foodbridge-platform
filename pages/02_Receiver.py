@@ -16,8 +16,12 @@ from datetime import datetime, timezone
 
 from firebase_config import (
     get_available_listings, get_all_listings, request_food,
-    get_receiver_requests, log_transaction, get_user_notifications
+    get_receiver_requests, log_transaction, get_user_notifications,
+    get_active_route_for_listing, 
+    create_razorpay_order, verify_razorpay_signature, RAZORPAY_KEY_ID,
+    delete_notification, get_user, update_user_subscription
 )
+import pandas as pd
 from styles import get_css, render_food_card, render_kpi
 
 st.markdown(get_css(), unsafe_allow_html=True)
@@ -33,11 +37,51 @@ if st.session_state.get("user_role") not in ("receiver", "admin"):
     st.page_link("app.py", label="← Go Home")
     st.stop()
 
+# ── Razorpay Callback Verification ──────────────────────────
+q_params = st.query_params
+if "payment_id" in q_params and "order_id" in q_params and "signature" in q_params:
+    pay_id = q_params["payment_id"]
+    ord_id = q_params["order_id"]
+    sig = q_params["signature"]
+    
+    verification_params = {
+        "razorpay_order_id": ord_id,
+        "razorpay_payment_id": pay_id,
+        "razorpay_signature": sig
+    }
+    
+    with st.spinner("Verifying payment transaction…"):
+        verified = verify_razorpay_signature(verification_params)
+        
+    if verified:
+        uid = st.session_state.uid
+        if update_user_subscription(uid, "pro", "active"):
+            log_transaction(uid, 999.0, "subscription", {
+                "tier": "pro",
+                "razorpay_payment_id": pay_id,
+                "razorpay_order_id": ord_id,
+                "verified": True
+            })
+            st.success("🎉 Payment verified successfully! Your account has been upgraded to Pro.")
+            st.balloons()
+            st.query_params.clear()
+            time.sleep(2)
+            st.rerun()
+        else:
+            st.error("❌ Failed to update subscription in database. Please contact support.")
+            st.query_params.clear()
+            time.sleep(2)
+            st.rerun()
+    else:
+        st.error("❌ Payment verification failed! Invalid Razorpay signature.")
+        st.query_params.clear()
+        time.sleep(2)
+        st.rerun()
+
 # ── Sidebar ───────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("""
     <div style="text-align:center;padding:0.8rem 0 1.2rem;">
-        <div style="font-size:1.8rem;">🌉</div>
         <div style="font-size:1rem;font-weight:800;font-family:'Space Grotesk',sans-serif;
                     background:linear-gradient(135deg,#34D399,#6366F1);
                     -webkit-background-clip:text;-webkit-text-fill-color:transparent;">FoodBridge</div>
@@ -68,6 +112,8 @@ with st.sidebar:
         st.page_link("pages/03_Admin.py", label="🛡️ Admin")
     st.page_link("pages/04_Route_Optimizer.py", label="🗺️ Route Optimizer")
     st.page_link("pages/05_Feedback.py", label="💬 Feedback")
+    if st.session_state.get("user_role") in ("admin", "donor"):
+        st.page_link("pages/06_Spoilage_Detector.py", label="🧪 Spoilage Detector")
     st.markdown("<hr>", unsafe_allow_html=True)
     if st.button("🚪 Sign Out", use_container_width=True):
         for k in list(st.session_state.keys()): del st.session_state[k]
@@ -249,6 +295,27 @@ with tab_myreq:
                 </div>
             </div>
             """, unsafe_allow_html=True)
+            
+            # Live Tracking UI
+            if status == "in_transit":
+                route = get_active_route_for_listing(req.get("listing_id"))
+                if route and "current_lat" in route and "current_lng" in route:
+                    st.markdown("""<div style="background:rgba(52,211,153,0.05);padding:1rem;border-radius:0 0 12px 12px;border:1px solid rgba(52,211,153,0.2);margin-top:-15px;margin-bottom:1rem;">
+                        <div style="font-weight:700;color:#34D399;margin-bottom:0.5rem;">📍 Live Driver Location</div>
+                    """, unsafe_allow_html=True)
+                    
+                    df_loc = pd.DataFrame([{"lat": float(route["current_lat"]), "lon": float(route["current_lng"])}])
+                    st.map(df_loc, zoom=14, use_container_width=True)
+                    
+                    last_upd = route.get("last_updated", "just now")
+                    if hasattr(last_upd, "strftime"):
+                        last_upd = last_upd.strftime("%H:%M:%S")
+                    st.caption(f"Last updated: {last_upd}")
+                    
+                    if st.button("🔄 Refresh Location", key=f"ref_{req.get('listing_id')}"):
+                        st.rerun()
+                    st.markdown("</div>", unsafe_allow_html=True)
+
 
 
 # ════════════════════════════════════════════════════════════
@@ -316,36 +383,66 @@ with tab_notifs:
         st.info("No new notifications.", icon="📭")
     else:
         for n in notifs:
+            nid = n.get("notif_id")
             is_read = n.get("read", False)
             bg_color = "rgba(52,211,153,0.1)" if not is_read else "rgba(255,255,255,0.05)"
             icon = "🚨" if n.get("type") == "system" else "🥗"
             time_str = str(n.get("created_at", ""))[:16]
             
-            st.markdown(f"""
-            <div class="glass-card" style="background:{bg_color}; padding:1rem 1.5rem; margin-bottom:0.8rem; border-left: 4px solid #34D399;">
-                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                    <div>
-                        <div style="font-weight:700; font-size:1.05rem;">{icon} {n.get('title')}</div>
-                        <div style="color:rgba(228,237,255,0.8); margin-top:0.3rem; font-size:0.9rem;">{n.get('message')}</div>
+            n_col, d_col = st.columns([10, 1])
+            with n_col:
+                st.markdown(f"""
+                <div class="glass-card" style="background:{bg_color}; padding:1rem 1.5rem; margin-bottom:0.8rem; border-left: 4px solid #34D399;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                        <div>
+                            <div style="font-weight:700; font-size:1.05rem;">{icon} {n.get('title')}</div>
+                            <div style="color:rgba(228,237,255,0.8); margin-top:0.3rem; font-size:0.9rem;">{n.get('message')}</div>
+                        </div>
+                        <div style="font-size:0.75rem; color:rgba(228,237,255,0.4);">{time_str}</div>
                     </div>
-                    <div style="font-size:0.75rem; color:rgba(228,237,255,0.4);">{time_str}</div>
                 </div>
-            </div>
-            """, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
+            with d_col:
+                st.markdown("<div style='height:0.8rem'></div>", unsafe_allow_html=True)
+                if st.button("🗑️", key=f"del_notif_{nid}", help="Archive this notification"):
+                    delete_notification(nid)
+                    st.toast("Notification moved to archive")
+                    st.rerun()
 
 
 # ════════════════════════════════════════════════════════════
 # TAB 5 — SUBSCRIPTIONS & RAZORPAY
 # ════════════════════════════════════════════════════════════
 with tab_subs:
+    # Refresh user profile to get latest sub info
+    u_prof = get_user(uid) or {}
+    s_tier = u_prof.get("subscription_tier", "basic")
+    s_stat = u_prof.get("subscription_status", "active")
+    
     st.markdown("### 💳 Receiver Subscription Plans")
     st.markdown("Choose a plan to upgrade your limits and logistics options.")
     
+    # ── Current Status Banner ───────────────────────────────────
+    if s_tier == "pro":
+        status_color = "#34D399" if s_stat == "active" else "#FB923C" if s_stat == "paused" else "#F87171"
+        st.markdown(f"""
+        <div class="glass-card" style="border-left:5px solid {status_color}; padding:1.2rem; margin-bottom:1.5rem;">
+            <div style="font-size:0.85rem; color:rgba(228,237,255,0.5); text-transform:uppercase;">Current Plan</div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div style="font-size:1.5rem; font-weight:800; color:#fff;">PRO TIER</div>
+                <div class="badge" style="background:{status_color}22; color:{status_color}; border:1px solid {status_color}44;">
+                    {s_stat.upper()}
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
     col_basic, col_pro = st.columns(2)
     
     with col_basic:
-        st.markdown("""
-        <div class="glass-card" style="padding:2rem; text-align:center; height:100%;">
+        is_current = (s_tier == "basic")
+        st.markdown(f"""
+        <div class="glass-card" style="padding:2rem; text-align:center; height:100%; {'border:1px solid #34D399;' if is_current else ''}">
             <div style="font-size:1.5rem; font-weight:700; color:#fff;">Basic Plan</div>
             <div style="font-size:2rem; font-weight:900; color:#34D399; margin:1rem 0;">Free</div>
             <div style="text-align:left; color:rgba(228,237,255,0.7); font-size:0.9rem; line-height:1.8;">
@@ -355,15 +452,22 @@ with tab_subs:
                 ✗ Priority route assignment<br>
                 ✗ Dedicated support
             </div>
-            <div style="margin-top:2rem; padding:0.6rem; border:1px solid #34D399; color:#34D399; border-radius:8px;">Current Plan</div>
+            {f'<div style="margin-top:2rem; padding:0.6rem; border:1px solid #34D399; color:#34D399; border-radius:8px;">Current Plan</div>' if is_current else ''}
         </div>
         """, unsafe_allow_html=True)
+        if not is_current:
+            if st.button("Switch to Basic", key="downgrade_btn", use_container_width=True):
+                if update_user_subscription(uid, "basic", "active"):
+                    st.success("Switched to Basic plan.")
+                    time.sleep(1)
+                    st.rerun()
         
     with col_pro:
-        st.markdown("""
-        <div class="glass-card" style="padding:2rem; text-align:center; height:100%; border:1px solid #818CF8; background:rgba(99,102,241,0.05);">
+        is_pro = (s_tier == "pro")
+        st.markdown(f"""
+        <div class="glass-card" style="padding:2rem; text-align:center; height:100%; {'border:1px solid #818CF8;' if is_pro else ''} background:rgba(99,102,241,0.05);">
             <div style="font-size:1.5rem; font-weight:700; color:#fff;">Pro Plan</div>
-            <div style="font-size:2rem; font-weight:900; color:#818CF8; margin:1rem 0;">₹2,999 <span style="font-size:0.9rem;color:#ccc;">/ month</span></div>
+            <div style="font-size:2rem; font-weight:900; color:#818CF8; margin:1rem 0;">₹999 <span style="font-size:0.9rem;color:#ccc;">/ month</span></div>
             <div style="text-align:left; color:rgba(228,237,255,0.7); font-size:0.9rem; line-height:1.8;">
                 ✓ Browse available listings<br>
                 ✓ Premium priority pickup matching<br>
@@ -374,25 +478,82 @@ with tab_subs:
         </div>
         """, unsafe_allow_html=True)
         
-        # Razorpay Simulation (Streamlit HTML Component)
-        import streamlit.components.v1 as components
-        
-        # We simulate the Razorpay script here using a generic button for demo purposes
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("🚀 Upgrade to Pro (Pay with Razorpay)", use_container_width=True, type="primary"):
-            st.session_state.show_razorpay = True
-            
-        if st.session_state.get("show_razorpay"):
-            st.info("Simulating Razorpay payment flow...")
-            # Note: For a real Razorpay integration, we'd inject their standard <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-            # and pass the order_id created by razorpay python SDK on the backend.
-            time.sleep(2)
-            log_transaction(uid, 2999.0, "subscription", {"tier": "pro"})
-            st.success("✅ Payment successful! You are now subscribed to the Pro Plan.")
-            st.balloons()
-            st.session_state.show_razorpay = False
-            time.sleep(1.5)
-            st.rerun()
+        if not is_pro:
+            # Razorpay Integration
+            import streamlit.components.v1 as components
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("🚀 Upgrade to Pro (Pay with Razorpay)", use_container_width=True, type="primary"):
+                if not RAZORPAY_KEY_ID:
+                    st.warning("⚠️ Razorpay Key ID not found. Using simulation mode.")
+                    st.session_state.show_razorpay = "mock"
+                else:
+                    with st.spinner("Creating secure order..."):
+                        order = create_razorpay_order(999.0)
+                        if order:
+                            st.session_state.razorpay_order = order
+                            st.session_state.show_razorpay = "real"
+                        else:
+                            st.error("Failed to connect to Razorpay.")
+
+            # Real Razorpay Checkout
+            if st.session_state.get("show_razorpay") == "real":
+                order = st.session_state.razorpay_order
+                checkout_html = f"""
+                <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+                <script>
+                    var options = {{
+                        "key": "{RAZORPAY_KEY_ID}",
+                        "amount": "{order['amount']}",
+                        "currency": "INR",
+                        "name": "FoodBridge Platform",
+                        "order_id": "{order['id']}",
+                        "handler": function (response) {{
+                            var params = "?payment_id=" + encodeURIComponent(response.razorpay_payment_id) +
+                                         "&order_id=" + encodeURIComponent(response.razorpay_order_id) +
+                                         "&signature=" + encodeURIComponent(response.razorpay_signature);
+                            window.parent.location.href = window.parent.location.origin + window.parent.location.pathname + params;
+                        }}
+                    }};
+                    var rzp1 = new Razorpay(options);
+                    rzp1.open();
+                </script>
+                """
+                components.html(checkout_html, height=0)
+                st.info("💳 Opening Razorpay Checkout... Please complete your payment in the pop-up overlay.")
+                st.session_state.show_razorpay = None
+
+            elif st.session_state.get("show_razorpay") == "mock":
+                time.sleep(2)
+                update_user_subscription(uid, "pro", "active")
+                log_transaction(uid, 999.0, "subscription", {"tier": "pro", "mode": "demo"})
+                st.success("✅ Demo Payment successful!")
+                st.balloons()
+                st.session_state.show_razorpay = None
+                time.sleep(1.5)
+                st.rerun()
+        else:
+            # Manage Pro Sub
+            st.markdown("<br>", unsafe_allow_html=True)
+            m_col1, m_col2 = st.columns(2)
+            with m_col1:
+                if s_stat == "active":
+                    if st.button("⏸️ Pause Plan", use_container_width=True):
+                        update_user_subscription(uid, "pro", "paused")
+                        st.toast("Subscription paused.")
+                        time.sleep(1)
+                        st.rerun()
+                else:
+                    if st.button("▶️ Resume Plan", use_container_width=True):
+                        update_user_subscription(uid, "pro", "active")
+                        st.toast("Subscription resumed.")
+                        time.sleep(1)
+                        st.rerun()
+            with m_col2:
+                if st.button("❌ Cancel Pro", use_container_width=True, type="secondary"):
+                    update_user_subscription(uid, "basic", "active")
+                    st.toast("Subscription cancelled.")
+                    time.sleep(1)
+                    st.rerun()
 
 # ── Auto-refresh ─────────────────────────────────────────────
 if auto_ref:

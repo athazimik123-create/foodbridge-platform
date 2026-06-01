@@ -17,10 +17,15 @@ from datetime import datetime, timezone
 from itertools import permutations
 
 from firebase_config import (
-    get_available_listings, get_routes,
-    save_route, update_listing_status,
+    get_all_listings, get_routes,
+    save_route, update_listing_status, update_route_location,
     GOOGLE_MAPS_API_KEY
 )
+try:
+    from streamlit_geolocation import streamlit_geolocation
+except ImportError:
+    streamlit_geolocation = None
+
 from styles import get_css, render_kpi
 
 st.markdown(get_css(), unsafe_allow_html=True)
@@ -35,7 +40,6 @@ if not st.session_state.get("authenticated"):
 with st.sidebar:
     st.markdown("""
     <div style="text-align:center;padding:0.8rem 0 1.2rem;">
-        <div style="font-size:1.8rem;">🌉</div>
         <div style="font-size:1rem;font-weight:800;font-family:'Space Grotesk',sans-serif;
                     background:linear-gradient(135deg,#34D399,#6366F1);
                     -webkit-background-clip:text;-webkit-text-fill-color:transparent;">FoodBridge</div>
@@ -66,6 +70,8 @@ with st.sidebar:
         st.page_link("pages/03_Admin.py", label="🛡️ Admin")
     st.page_link("pages/04_Route_Optimizer.py", label="🗺️ Route Optimizer")
     st.page_link("pages/05_Feedback.py", label="💬 Feedback")
+    if st.session_state.get("user_role") in ("admin", "donor"):
+        st.page_link("pages/06_Spoilage_Detector.py", label="🧪 Spoilage Detector")
     st.markdown("<hr>", unsafe_allow_html=True)
     if st.button("🚪 Sign Out", use_container_width=True):
         for k in list(st.session_state.keys()): del st.session_state[k]
@@ -190,8 +196,8 @@ with st.expander("ℹ️ How the Route Optimizer Works", expanded=False):
     """)
 
 # ── Load listings with geo data ───────────────────────────────
-all_listings = get_available_listings(60)
-geo_listings = [l for l in all_listings if l.get("lat") and l.get("lng")]
+all_listings = get_all_listings(100)
+geo_listings = [l for l in all_listings if l.get("lat") and l.get("lng") and l.get("status") in ("available", "requested")]
 
 # Build stop tuples: (lat, lng, label, listing_id)
 stops_raw = [
@@ -424,6 +430,8 @@ with st.expander("📂 Saved Routes History", expanded=False):
         for r in routes:
             created = str(r.get("created_at",""))[:16]
             wp_count = len(r.get("waypoints", []))
+            r_id = r['route_id']
+            status = r.get('status','planned')
             gm_link = build_google_maps_url([
                 (w["lat"], w["lng"], w.get("label","")) for w in r.get("waypoints",[])
             ])
@@ -431,7 +439,7 @@ with st.expander("📂 Saved Routes History", expanded=False):
             <div class="route-card">
                 <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
                     <div>
-                        <div style="font-weight:700;color:#fff;">🗺️ Route {r['route_id'][:10]}…</div>
+                        <div style="font-weight:700;color:#fff;">🗺️ Route {r_id[:10]}…</div>
                         <div style="font-size:0.78rem;color:rgba(228,237,255,0.45);margin-top:0.2rem;">
                             {wp_count} waypoints &nbsp;·&nbsp;
                             {r.get('total_km',0):.1f} km &nbsp;·&nbsp;
@@ -439,8 +447,43 @@ with st.expander("📂 Saved Routes History", expanded=False):
                             Saved: {created}
                         </div>
                     </div>
-                    <span class="badge badge-{'green' if r.get('status')=='planned' else 'blue'}">{r.get('status','planned')}</span>
+                    <span class="badge badge-{'green' if status=='planned' else 'blue' if status=='active' else 'gray'}">{status}</span>
                 </div>
                 {"<a href='" + gm_link + "' target='_blank' style='font-size:0.78rem;color:#34D399;text-decoration:none;'>→ Open in Google Maps</a>" if gm_link else ""}
             </div>
             """, unsafe_allow_html=True)
+            
+            # Tracking UI
+            if status in ("planned", "active"):
+                with st.container():
+                    st.markdown("""<div style="background:rgba(16,185,129,0.05);padding:1rem;border-radius:0 0 12px 12px;border:1px solid rgba(16,185,129,0.2);margin-top:-10px;margin-bottom:1rem;">""", unsafe_allow_html=True)
+                    if status == "planned":
+                        if st.button(f"🚀 Start Delivery Route", key=f"start_{r_id}", use_container_width=True):
+                            wps = r.get("waypoints", [])
+                            s_lat = wps[0]["lat"] if wps else 0.0001
+                            s_lng = wps[0]["lng"] if wps else 0.0001
+                            update_route_location(r_id, s_lat, s_lng, status="active")
+                            # Mark listings as in_transit
+                            for lid in r.get("listing_ids", []):
+                                update_listing_status(lid, "in_transit")
+                            st.success("Route Started! Listings are now In Transit.")
+                            st.rerun()
+                    elif status == "active":
+                        st.markdown("**📍 Broadcast GPS Location**")
+                        st.caption("Click below to fetch your current GPS coordinates and broadcast them to receivers.")
+                        if streamlit_geolocation:
+                            loc = streamlit_geolocation()
+                            if loc and loc.get('latitude') and loc.get('longitude'):
+                                lat = float(loc['latitude'])
+                                lng = float(loc['longitude'])
+                                update_route_location(r_id, lat, lng)
+                                st.success(f"Location broadcasted: {lat:.4f}, {lng:.4f}")
+                        else:
+                            st.error("Geolocation plugin not installed.")
+                            
+                        if st.button("🏁 Mark Route Completed", key=f"end_{r_id}"):
+                            update_route_location(r_id, 0.0, 0.0, status="completed")
+                            for lid in r.get("listing_ids", []):
+                                update_listing_status(lid, "delivered")
+                            st.rerun()
+                    st.markdown("</div>", unsafe_allow_html=True)

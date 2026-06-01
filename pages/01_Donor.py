@@ -12,6 +12,8 @@ st.set_page_config(page_title="Donor Dashboard · FoodBridge", page_icon="🍽�
 
 import time
 from datetime import datetime, timezone, timedelta
+import requests
+import urllib.parse
 
 from firebase_config import (
     create_food_listing, get_donor_listings, get_all_listings,
@@ -37,7 +39,6 @@ if st.session_state.get("user_role") not in ("donor", "admin"):
 with st.sidebar:
     st.markdown("""
     <div style="text-align:center;padding:0.8rem 0 1.2rem;">
-        <div style="font-size:1.8rem;">🌉</div>
         <div style="font-size:1rem;font-weight:800;font-family:'Space Grotesk',sans-serif;
                     background:linear-gradient(135deg,#34D399,#6366F1);
                     -webkit-background-clip:text;-webkit-text-fill-color:transparent;">FoodBridge</div>
@@ -59,6 +60,8 @@ with st.sidebar:
         st.page_link("pages/03_Admin.py", label="🛡️ Admin")
     st.page_link("pages/04_Route_Optimizer.py", label="🗺️ Route Optimizer")
     st.page_link("pages/05_Feedback.py", label="💬 Feedback")
+    if st.session_state.get("user_role") in ("admin", "donor"):
+        st.page_link("pages/06_Spoilage_Detector.py", label="🧪 Spoilage Detector")
     st.markdown("<hr>", unsafe_allow_html=True)
     if st.button("🚪 Sign Out", use_container_width=True):
         for k in list(st.session_state.keys()): del st.session_state[k]
@@ -114,7 +117,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 # TABS
 # ════════════════════════════════════════════════════════════
 tab_label = "📋 All Listings" if role == "admin" else "📋 My Listings"
-tab_list, tab_new, tab_map, tab_smart = st.tabs([tab_label, "➕ Add New Listing", "📍 Location Preview", "🤖 Smart Container"])
+tab_list, tab_new, tab_map = st.tabs([tab_label, "➕ Add New Listing", "📍 Location Preview"])
 
 # ── Priority helper ───────────────────────────────────────────
 def _get_priority(expiry_dt_str):
@@ -195,13 +198,13 @@ with tab_list:
 
                         # ── Delete confirmation ───────────────
                         if st.session_state.get(f"confirming_delete_{lid}", False):
-                            st.warning("⚠️ This will permanently delete the listing. Are you sure?")
+                            st.warning("⚠️ This will move the listing to the Archive. Are you sure?")
                             conf_col1, conf_col2 = st.columns(2)
                             with conf_col1:
-                                if st.button("✅ Yes, Delete", key=f"confirm_del_{lid}", use_container_width=True):
+                                if st.button("✅ Yes, Remove", key=f"confirm_del_{lid}", use_container_width=True):
                                     delete_food_listing(lid)
                                     st.session_state.pop(f"confirming_delete_{lid}", None)
-                                    st.toast("Listing permanently deleted.", icon="🗑️")
+                                    st.toast("Listing moved to Archive.", icon="🗂️")
                                     time.sleep(0.6)
                                     st.rerun()
                             with conf_col2:
@@ -319,19 +322,15 @@ with tab_new:
                 "Morning (6am–12pm)", "Afternoon (12pm–5pm)", "Evening (5pm–9pm)", "Flexible (Anytime)"
             ])
             expiry_hrs = st.slider("Food Safe For (hours)", 1, 72, 8)
-            premium    = st.checkbox("⚡ Enable Priority Pickup (+₹4.99 platform fee)",
+            premium    = st.checkbox("⚡ Enable Priority Pickup (+₹499 platform fee)",
                                      help="Logistics partners prioritize premium pickups")
 
         description = st.text_area("Description", placeholder="Add details about quantity, condition, packaging, etc.", height=90)
         tags_input  = st.text_input("Tags (comma-separated)", placeholder="veg, hot-food, packaged")
 
-        # Location coordinates (auto-fill via Google Maps or manual)
-        st.markdown("**📍 Pickup Location Coordinates**")
-        col_lat, col_lng = st.columns(2)
-        with col_lat:
-            lat = st.number_input("Latitude", value=19.0760, format="%.4f")
-        with col_lng:
-            lng = st.number_input("Longitude", value=72.8777, format="%.4f")
+        st.markdown("""<div style="font-size:0.8rem;color:rgba(228,237,255,0.45);margin-bottom:1rem;margin-top:0.5rem;padding-left:0.5rem;border-left:3px solid #34D399;">
+            📍 <i>Your exact pickup coordinates will be automatically determined from your address when you publish.</i>
+        </div>""", unsafe_allow_html=True)
 
         submit = st.form_submit_button("🚀 Publish Listing", use_container_width=True)
 
@@ -339,28 +338,42 @@ with tab_new:
         if not food_name or not address:
             st.error("Please fill in Food Name and Pickup Address.")
         else:
-            tags = [t.strip() for t in tags_input.split(",") if t.strip()]
-            expiry_dt = (datetime.now(timezone.utc) + timedelta(hours=expiry_hrs)).isoformat()
-            data = {
-                "donor_id":     uid,
-                "donor_name":   st.session_state.user_name,
-                "food_name":    food_name,
-                "food_type":    food_type,
-                "quantity_kg":  quantity,
-                "servings":     servings,
-                "description":  description,
-                "address":      address,
-                "lat":          lat,
-                "lng":          lng,
-                "expiry_dt":    expiry_dt,
-                "pickup_window": pickup_win,
-                "tags":          tags,
-                "premium_pickup": premium,
-            }
-            with st.spinner("Publishing your listing to Firestore…"):
+            with st.spinner("Geocoding address and publishing your listing to Firestore…"):
+                # Geocode the address via Nominatim API
+                lat, lng = 19.0760, 72.8777 # default fallback
+                try:
+                    url = f"https://nominatim.openstreetmap.org/search?q={urllib.parse.quote(address)}&format=json&limit=1"
+                    headers = {"User-Agent": "FoodBridgeApp/1.0"}
+                    resp = requests.get(url, headers=headers)
+                    jdata = resp.json()
+                    if jdata:
+                        lat = float(jdata[0]["lat"])
+                        lng = float(jdata[0]["lon"])
+                except Exception as e:
+                    print(f"Geocoding failed: {e}")
+                    pass # Silently fallback to default coordinates
+
+                tags = [t.strip() for t in tags_input.split(",") if t.strip()]
+                expiry_dt = (datetime.now(timezone.utc) + timedelta(hours=expiry_hrs)).isoformat()
+                data = {
+                    "donor_id":     uid,
+                    "donor_name":   st.session_state.user_name,
+                    "food_name":    food_name,
+                    "food_type":    food_type,
+                    "quantity_kg":  quantity,
+                    "servings":     servings,
+                    "description":  description,
+                    "address":      address,
+                    "lat":          lat,
+                    "lng":          lng,
+                    "expiry_dt":    expiry_dt,
+                    "pickup_window": pickup_win,
+                    "tags":          tags,
+                    "premium_pickup": premium,
+                }
                 listing_id = create_food_listing(data)
                 if premium:
-                    log_transaction(uid, 4.99, "logistics_fee", {"listing_id": listing_id})
+                    log_transaction(uid, 499.0, "logistics_fee", {"listing_id": listing_id})
 
             st.success(f"""
             ✅ **Listing Published!** Listing ID: `{listing_id}`
@@ -426,209 +439,5 @@ with tab_map:
                 if not df_map.empty:
                     st.map(df_map)
 
-# ════════════════════════════════════════════════════════════
-# TAB 4 — SMART CONTAINER
-# ════════════════════════════════════════════════════════════
-with tab_smart:
-    st.markdown("""<div class="glass-card" style="margin-bottom:1.5rem;">
-        <div style="font-size:1.1rem;font-weight:700;margin-bottom:0.5rem;color:#34D399;">
-            🤖 Smart Container System
-        </div>
-        <div style="font-size:0.82rem;color:rgba(228,237,255,0.5);">
-            Enter food details and logistics info. The system will automatically calculate
-            remaining shelf life, estimate delivery time, and decide whether to redistribute or dispose.
-            A dynamic priority score is computed based on demand, quantity, and urgency.
-        </div>
-    </div>""", unsafe_allow_html=True)
-
-    # ── INPUTS ────────────────────────────────────────────────
-    st.markdown("#### 📥 Inputs")
-    with st.form("smart_container_form", clear_on_submit=False):
-        inp_col1, inp_col2 = st.columns(2)
-        with inp_col1:
-            sc_food_name = st.text_input("🍱 Food Name", value="Mixed Surplus Food")
-            sc_food_type = st.selectbox("🥗 Food Type", [
-                "Bakery", "Prepared Meals", "Produce",
-                "Dairy", "Seafood", "Grains", "Fruits", "Snacks", "Mixed"
-            ])
-            sc_qty = st.slider("📦 Predicted Fill Level (kg)", min_value=0.5, max_value=50.0, value=15.0)
-            sc_demand = st.selectbox("📈 Demand Level", ["Low (1)", "Medium (2)", "High (3)"],
-                                     index=1, help="Estimated receiver demand for this food type.")
-        with inp_col2:
-            sc_expiry_time = st.time_input("⏰ Expiry Time", value=datetime.now(timezone.utc).replace(hour=20, minute=0, second=0).time())
-            sc_current_time = st.time_input("🕐 Current Time", value=datetime.now(timezone.utc).time())
-            sc_distance_km = st.number_input("📍 Distance to Receiver (km)", min_value=0.1, max_value=200.0, value=12.0, step=0.5)
-            sc_travel_hours = st.number_input("🚦 Travel/Traffic Time (hours)", min_value=0.1, max_value=10.0, value=1.0, step=0.1,
-                                              help="Estimated travel time including traffic.")
-
-        sc_pickup_hours = st.number_input("🔄 Pickup + Distribution Time (hours)", min_value=0.1, max_value=5.0, value=1.0, step=0.1)
-        sc_address = st.text_input("📌 Container Location", value="Community Smart Container #1, Bandra, Mumbai")
-        sc_submit  = st.form_submit_button("🧪 Run System Check", use_container_width=True)
-
-    if sc_submit:
-        # ── Step 1: Remaining Shelf Life ──────────────────────
-        from datetime import date as _date
-        today = _date.today()
-        expiry_dt  = datetime.combine(today, sc_expiry_time).replace(tzinfo=timezone.utc)
-        current_dt = datetime.combine(today, sc_current_time).replace(tzinfo=timezone.utc)
-
-        remaining_hours = (expiry_dt - current_dt).total_seconds() / 3600
-        if remaining_hours < 0:
-            # expiry is next day
-            from datetime import timedelta as _td
-            expiry_dt = expiry_dt + _td(days=1)
-            remaining_hours = (expiry_dt - current_dt).total_seconds() / 3600
-
-        # ── Step 2: Delivery Time ─────────────────────────────
-        delivery_hours = sc_travel_hours + sc_pickup_hours
-
-        # ── Step 3: Decision ──────────────────────────────────
-        is_safe    = delivery_hours < remaining_hours
-        status     = "available" if is_safe else "disposed"
-
-        # ── Priority classification ────────────────────────────
-        if remaining_hours <= 2:
-            priority_label, priority_colour, priority_icon = "High",   "#F87171", "🔴"
-        elif remaining_hours <= 48:
-            priority_label, priority_colour, priority_icon = "Medium", "#FB923C", "🟠"
-        else:
-            priority_label, priority_colour, priority_icon = "Low",    "#34D399", "🟢"
-
-        # ── Dynamic Priority Score ─────────────────────────────
-        demand_map    = {"Low (1)": 1, "Medium (2)": 2, "High (3)": 3}
-        demand_level  = demand_map[sc_demand]
-        priority_score = round((demand_level * sc_qty) / max(remaining_hours, 0.01), 2)
-
-        # ── DISPLAY: Step-by-step breakdown ───────────────────
-        st.markdown("---")
-        st.markdown("#### 🔍 System Check Results")
-
-        chk1, chk2, chk3 = st.columns(3)
-        with chk1:
-            st.markdown(f"""
-            <div class="glass-card" style="border-top:3px solid #818CF8;text-align:center;padding:1.2rem;">
-                <div style="font-size:0.8rem;color:rgba(228,237,255,0.5);text-transform:uppercase;letter-spacing:0.08em;">Step 1</div>
-                <div style="font-size:1rem;font-weight:700;color:#E4EDFF;margin:0.5rem 0;">⏳ Remaining Shelf Life</div>
-                <div style="font-size:0.85rem;color:rgba(228,237,255,0.6);">
-                    Expiry: <b>{sc_expiry_time.strftime('%I:%M %p')}</b><br>
-                    Current: <b>{sc_current_time.strftime('%I:%M %p')}</b>
-                </div>
-                <div style="font-size:2rem;font-weight:900;color:#818CF8;margin-top:0.6rem;">{remaining_hours:.1f} hrs</div>
-            </div>""", unsafe_allow_html=True)
-
-        with chk2:
-            st.markdown(f"""
-            <div class="glass-card" style="border-top:3px solid #FB923C;text-align:center;padding:1.2rem;">
-                <div style="font-size:0.8rem;color:rgba(228,237,255,0.5);text-transform:uppercase;letter-spacing:0.08em;">Step 2</div>
-                <div style="font-size:1rem;font-weight:700;color:#E4EDFF;margin:0.5rem 0;">🚚 Est. Delivery Time</div>
-                <div style="font-size:0.85rem;color:rgba(228,237,255,0.6);">
-                    Travel: <b>{sc_travel_hours} hrs</b><br>
-                    Pickup+Dist: <b>{sc_pickup_hours} hrs</b>
-                </div>
-                <div style="font-size:2rem;font-weight:900;color:#FB923C;margin-top:0.6rem;">{delivery_hours:.1f} hrs</div>
-            </div>""", unsafe_allow_html=True)
-
-        with chk3:
-            dec_color = "#34D399" if is_safe else "#F87171"
-            dec_icon  = "✅" if is_safe else "🛑"
-            dec_label = "REDISTRIBUTE" if is_safe else "DISPOSE"
-            dec_text  = f"{delivery_hours:.1f} hrs &lt; {remaining_hours:.1f} hrs" if is_safe else f"{delivery_hours:.1f} hrs &gt; {remaining_hours:.1f} hrs"
-            st.markdown(f"""
-            <div class="glass-card" style="border-top:3px solid {dec_color};text-align:center;padding:1.2rem;">
-                <div style="font-size:0.8rem;color:rgba(228,237,255,0.5);text-transform:uppercase;letter-spacing:0.08em;">Step 3</div>
-                <div style="font-size:1rem;font-weight:700;color:#E4EDFF;margin:0.5rem 0;">{dec_icon} Decision</div>
-                <div style="font-size:0.82rem;color:rgba(228,237,255,0.6);">{dec_text}</div>
-                <div style="font-size:1.5rem;font-weight:900;color:{dec_color};margin-top:0.6rem;">{dec_label}</div>
-            </div>""", unsafe_allow_html=True)
-
-        # ── Priority Table + Score ────────────────────────────
-        st.markdown("<br>", unsafe_allow_html=True)
-        pr_col1, pr_col2 = st.columns([3, 2])
-        with pr_col1:
-            st.markdown("""
-            <div class="glass-card" style="padding:1.2rem 1.5rem;">
-                <div style="font-size:0.95rem;font-weight:700;color:#E4EDFF;margin-bottom:0.8rem;">📊 Priority Reference</div>
-                <table style="width:100%;border-collapse:collapse;font-size:0.84rem;">
-                    <thead>
-                        <tr style="color:rgba(228,237,255,0.5);border-bottom:1px solid rgba(255,255,255,0.08);">
-                            <th style="text-align:left;padding:0.4rem 0.8rem;">Condition</th>
-                            <th style="text-align:left;padding:0.4rem 0.8rem;">Priority</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-                            <td style="padding:0.5rem 0.8rem;color:rgba(228,237,255,0.8);">🔴 Expiring within 1–2 hrs</td>
-                            <td style="padding:0.5rem 0.8rem;"><span style="color:#F87171;font-weight:700;">High</span></td>
-                        </tr>
-                        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-                            <td style="padding:0.5rem 0.8rem;color:rgba(228,237,255,0.8);">🟠 Medium freshness (2–48 hrs)</td>
-                            <td style="padding:0.5rem 0.8rem;"><span style="color:#FB923C;font-weight:700;">Medium</span></td>
-                        </tr>
-                        <tr>
-                            <td style="padding:0.5rem 0.8rem;color:rgba(228,237,255,0.8);">🟢 Long shelf life (&gt;48 hrs)</td>
-                            <td style="padding:0.5rem 0.8rem;"><span style="color:#34D399;font-weight:700;">Low</span></td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>""", unsafe_allow_html=True)
-
-        with pr_col2:
-            st.markdown(f"""
-            <div class="glass-card" style="padding:1.5rem;text-align:center;border:1px solid {priority_colour}44;">
-                <div style="font-size:0.85rem;color:rgba(228,237,255,0.5);text-transform:uppercase;letter-spacing:0.08em;">
-                    Dynamic Priority Score
-                </div>
-                <div style="font-size:0.75rem;color:rgba(228,237,255,0.35);margin:0.3rem 0 0.8rem;">
-                    (Demand × Quantity) ÷ Remaining Shelf Life
-                </div>
-                <div style="font-size:0.75rem;color:rgba(228,237,255,0.35);margin:0.3rem 0 0.8rem;">
-                    ({demand_level} × {sc_qty}) ÷ {remaining_hours:.1f} hrs
-                </div>
-                <div style="font-size:3rem;font-weight:900;color:{priority_colour};line-height:1;">{priority_score}</div>
-                <div style="margin-top:0.8rem;">
-                    <span style="display:inline-block;padding:4px 16px;border-radius:20px;
-                        background:{priority_colour}22;color:{priority_colour};
-                        border:1px solid {priority_colour}55;font-weight:700;font-size:0.85rem;">
-                        {priority_icon} {priority_label} Priority
-                    </span>
-                </div>
-                <div style="font-size:0.72rem;color:rgba(228,237,255,0.35);margin-top:0.5rem;">
-                    Higher score = higher delivery priority
-                </div>
-            </div>""", unsafe_allow_html=True)
-
-        # ── Create listing ────────────────────────────────────
-        st.markdown("<br>", unsafe_allow_html=True)
-        data = {
-            "donor_id":      uid,
-            "donor_name":    st.session_state.user_name + " (Smart Container)",
-            "food_name":     sc_food_name,
-            "food_type":     sc_food_type,
-            "quantity_kg":   sc_qty,
-            "servings":      int(sc_qty * 2.5),
-            "description":   (
-                f"Smart Container | Shelf Life: {remaining_hours:.1f}h | "
-                f"Delivery Est: {delivery_hours:.1f}h | Priority Score: {priority_score} | "
-                f"Decision: {'Redistribute' if is_safe else 'Dispose'}"
-            ),
-            "address":       sc_address,
-            "lat":           19.0596,
-            "lng":           72.8295,
-            "expiry_dt":     expiry_dt.isoformat(),
-            "pickup_window": "Flexible",
-            "tags":          ["smart-container", sc_food_type.lower(), priority_label.lower() + "-priority"],
-            "premium_pickup": False,
-            "status":        status,
-        }
-
-        with st.spinner("Processing Smart Container data…"):
-            listing_id = create_food_listing(data)
-            time.sleep(1)
-
-        if not is_safe:
-            st.error(f"🛑 **Food Disposed!** Estimated delivery ({delivery_hours:.1f}h) exceeds remaining shelf life ({remaining_hours:.1f}h). Food routed to disposal. (`{listing_id}`)")
-        else:
-            st.success(f"✅ **Food safe to redistribute!** Delivery in {delivery_hours:.1f}h, shelf life {remaining_hours:.1f}h. Receivers notified! (`{listing_id}`)")
-            st.balloons()
 
 

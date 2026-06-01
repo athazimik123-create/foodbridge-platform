@@ -22,7 +22,6 @@ if not st.session_state.get("authenticated"):
 with st.sidebar:
     st.markdown("""
     <div style="text-align:center;padding:0.8rem 0 1.2rem;">
-        <div style="font-size:1.8rem;">🌉</div>
         <div style="font-size:1rem;font-weight:800;font-family:'Space Grotesk',sans-serif;
                     background:linear-gradient(135deg,#34D399,#6366F1);
                     -webkit-background-clip:text;-webkit-text-fill-color:transparent;">FoodBridge</div>
@@ -46,6 +45,8 @@ with st.sidebar:
         st.page_link("pages/03_Admin.py", label="🛡️ Admin")
     st.page_link("pages/04_Route_Optimizer.py", label="🗺️ Route Optimizer")
     st.page_link("pages/05_Feedback.py", label="💬 Feedback")
+    if role in ("admin", "donor"):
+        st.page_link("pages/06_Spoilage_Detector.py", label="🧪 Spoilage Detector")
     st.markdown("<hr>", unsafe_allow_html=True)
     if st.button("🚪 Sign Out", use_container_width=True):
         for k in list(st.session_state.keys()):

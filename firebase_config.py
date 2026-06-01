@@ -37,6 +37,9 @@ PROJECT_ID           = _env("FIREBASE_PROJECT_ID", "foodbridge-demo")
 FIREBASE_WEB_API_KEY = _env("FIREBASE_WEB_API_KEY", "DEMO_KEY")
 GOOGLE_MAPS_API_KEY  = _env("GOOGLE_MAPS_API_KEY", "")
 
+RAZORPAY_KEY_ID      = _env("RAZORPAY_KEY_ID", "")
+RAZORPAY_KEY_SECRET  = _env("RAZORPAY_KEY_SECRET", "")
+
 # ── Firebase init (singleton) ────────────────────────────────
 def _init_firebase():
     if firebase_admin._apps:
@@ -98,7 +101,7 @@ def sign_in(email: str, password: str) -> dict:
     if FIREBASE_WEB_API_KEY == "DEMO_KEY":
         # MOCK AUTH
         _mu = {
-            "admin@foodbridge.com":    {"role": "admin",    "name": "Admin Alex"},
+            "admin@foodbridge.com":    {"role": "admin",    "name": "Admin Atha"},
             "donor@foodbridge.com":    {"role": "donor",    "name": "Diana Donor"},
             "receiver@foodbridge.com": {"role": "receiver", "name": "Rachel NGO"},
         }
@@ -168,6 +171,50 @@ def get_all_users() -> List[dict]:
         docs = db.collection("users").stream()
         return [d.to_dict() for d in docs]
     return list(_MOCK_USERS.values())
+
+
+def delete_user(uid: str) -> bool:
+    """Delete user profile from Firestore and attempt to delete from Auth."""
+    if db:
+        try:
+            # Delete from Firestore
+            db.collection("users").document(uid).delete()
+            # Attempt to delete from Auth (requires Admin SDK)
+            try:
+                auth.delete_user(uid)
+            except Exception as e:
+                print(f"[Auth] Could not delete user from Auth: {e}")
+            return True
+        except Exception:
+            return False
+    else:
+        # Mock logic
+        if uid in _MOCK_USERS:
+            del _MOCK_USERS[uid]
+            return True
+        return False
+
+
+def update_user_subscription(uid: str, tier: str, status: str = "active") -> bool:
+    """Update user's subscription tier and status (active, paused, cancelled)."""
+    if db:
+        try:
+            db.collection("users").document(uid).update({
+                "subscription_tier": tier,
+                "subscription_status": status,
+                "subscription_updated_at": datetime.now(timezone.utc)
+            })
+            return True
+        except Exception:
+            return False
+    else:
+        # Mock logic
+        if uid in _MOCK_USERS:
+            _MOCK_USERS[uid]["subscription_tier"] = tier
+            _MOCK_USERS[uid]["subscription_status"] = status
+            return True
+        # For demo purposes, if uid is not in mock, we can't update it unless we add it
+        return False
 
 
 # ════════════════════════════════════════════════════════════
@@ -253,7 +300,7 @@ def request_food(listing_id: str, receiver_id: str, premium: bool = False) -> No
         "status":      "requested",
         "requested_at": datetime.now(timezone.utc),
         "premium_pickup": premium,
-        "revenue_generated": 4.99 if premium else 0.0,
+        "revenue_generated": 499.0 if premium else 0.0,
     }
     if db:
         db.collection("food_listings").document(listing_id).update(update)
@@ -288,7 +335,11 @@ def update_food_listing(listing_id: str, fields: dict) -> None:
 
 
 def delete_food_listing(listing_id: str) -> None:
-    """Hard-delete a food listing from Firestore (or mock store)."""
+    """Soft-delete: move listing to 'archived' status instead of hard-deleting."""
+    archive_food_listing(listing_id)
+
+def purge_food_listing(listing_id: str) -> None:
+    """Hard-delete a food listing permanently from Firestore."""
     if db:
         db.collection("food_listings").document(listing_id).delete()
     else:
@@ -398,6 +449,24 @@ def get_all_transactions(limit: int = 200) -> List[dict]:
     return sorted(_MOCK_TRANSACTIONS, key=lambda x: x.get("timestamp") or "", reverse=True)
 
 
+def clear_all_transactions() -> bool:
+    """Delete all records from the transactions collection."""
+    if db:
+        try:
+            batch = db.batch()
+            docs = db.collection("transactions").limit(500).stream()
+            for d in docs:
+                batch.delete(d.reference)
+            batch.commit()
+            return True
+        except Exception:
+            return False
+    else:
+        global _MOCK_TRANSACTIONS
+        _MOCK_TRANSACTIONS = []
+        return True
+
+
 # ════════════════════════════════════════════════════════════
 # DELIVERY ROUTES  (route optimizer data)
 # ════════════════════════════════════════════════════════════
@@ -426,6 +495,35 @@ def get_routes(limit: int = 20) -> List[dict]:
         docs = db.collection("routes").limit(limit).stream()
         return [d.to_dict() for d in docs]
     return _MOCK_ROUTES
+
+def update_route_location(route_id: str, lat: float, lng: float, status: str = None) -> None:
+    updates = {
+        "current_lat": lat,
+        "current_lng": lng,
+        "last_updated": datetime.now(timezone.utc)
+    }
+    if status:
+        updates["status"] = status
+        
+    if db:
+        db.collection("routes").document(route_id).update(updates)
+    else:
+        for r in _MOCK_ROUTES:
+            if r["route_id"] == route_id:
+                r.update(updates)
+                break
+
+def get_active_route_for_listing(listing_id: str) -> dict | None:
+    if db:
+        docs = db.collection("routes").where("status", "in", ["active", "planned"]).where("listing_ids", "array_contains", listing_id).limit(1).stream()
+        for d in docs:
+            return d.to_dict()
+        return None
+    
+    for r in _MOCK_ROUTES:
+        if r.get("status") in ("active", "planned") and listing_id in r.get("listing_ids", []):
+            return r
+    return None
 
 
 # ════════════════════════════════════════════════════════════
@@ -468,7 +566,7 @@ def get_platform_stats() -> dict:
 def _uid(email): return str(uuid.uuid5(uuid.NAMESPACE_DNS, email))
 
 _MOCK_USERS = {
-    _uid("admin@foodbridge.com"):    {"uid": _uid("admin@foodbridge.com"),    "name": "Admin Alex",   "email": "admin@foodbridge.com",    "role": "admin",    "subscription_tier": "pro"},
+    _uid("admin@foodbridge.com"):    {"uid": _uid("admin@foodbridge.com"),    "name": "Admin Atha",   "email": "admin@foodbridge.com",    "role": "admin",    "subscription_tier": "pro"},
     _uid("donor@foodbridge.com"):    {"uid": _uid("donor@foodbridge.com"),    "name": "Diana Donor",  "email": "donor@foodbridge.com",    "role": "donor",    "subscription_tier": "basic"},
     _uid("receiver@foodbridge.com"): {"uid": _uid("receiver@foodbridge.com"), "name": "Rachel NGO",   "email": "receiver@foodbridge.com", "role": "receiver", "subscription_tier": "basic"},
 }
@@ -559,13 +657,43 @@ def get_user_notifications(receiver_id: str, limit: int = 20) -> List[dict]:
     if db:
         # Fetch notifications for this receiver or "all", avoiding composite index
         docs_all = db.collection("notifications").where("receiver_id", "in", [receiver_id, "all"]).stream()
-        res = [d.to_dict() for d in docs_all]
+        res = [d.to_dict() for d in docs_all if d.to_dict().get("status") != "archived"]
         res.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
         return res[:limit]
     
     # Mock fallback
-    notifs = [n for n in _MOCK_NOTIFICATIONS if n.get("receiver_id") in (receiver_id, "all")]
+    notifs = [n for n in _MOCK_NOTIFICATIONS if n.get("receiver_id") in (receiver_id, "all") and n.get("status") != "archived"]
     return sorted(notifs, key=lambda x: x.get("created_at") or "", reverse=True)
+
+def delete_notification(notif_id: str) -> None:
+    """Soft-delete: mark notification as archived."""
+    if db:
+        db.collection("notifications").document(notif_id).update({
+            "status": "archived",
+            "archived_at": datetime.now(timezone.utc)
+        })
+    else:
+        for n in _MOCK_NOTIFICATIONS:
+            if n["notif_id"] == notif_id:
+                n["status"] = "archived"
+                n["archived_at"] = datetime.now(timezone.utc)
+                break
+
+def get_archived_notifications(limit: int = 100) -> List[dict]:
+    if db:
+        docs = db.collection("notifications").where("status", "==", "archived").limit(limit).stream()
+        res = [d.to_dict() for d in docs]
+        res.sort(key=lambda x: str(x.get("archived_at") or ""), reverse=True)
+        return res
+    return sorted([n for n in _MOCK_NOTIFICATIONS if n.get("status") == "archived"], 
+                  key=lambda x: x.get("archived_at") or "", reverse=True)
+
+def purge_notification(notif_id: str) -> None:
+    if db:
+        db.collection("notifications").document(notif_id).delete()
+    else:
+        global _MOCK_NOTIFICATIONS
+        _MOCK_NOTIFICATIONS = [n for n in _MOCK_NOTIFICATIONS if n["notif_id"] != notif_id]
 
 # ════════════════════════════════════════════════════════════
 # FEEDBACK
@@ -593,4 +721,48 @@ def get_all_feedback(limit: int = 50) -> List[dict]:
         docs = db.collection("feedback").order_by("timestamp", direction=firestore.Query.DESCENDING).limit(limit).stream()
         return [d.to_dict() for d in docs]
     return sorted(_MOCK_FEEDBACK, key=lambda x: x.get("timestamp") or "", reverse=True)
+
+def delete_feedback(fb_id: str) -> None:
+    if db:
+        db.collection("feedback").document(fb_id).delete()
+    else:
+        global _MOCK_FEEDBACK
+        _MOCK_FEEDBACK = [f for f in _MOCK_FEEDBACK if f["feedback_id"] != fb_id]
+
+# ════════════════════════════════════════════════════════════
+# RAZORPAY HELPERS
+# ════════════════════════════════════════════════════════════
+
+def create_razorpay_order(amount_in_inr: float) -> dict | None:
+    """Create an order via Razorpay API."""
+    if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
+        return None
+    
+    try:
+        import razorpay
+        client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
+        data = {
+            "amount": int(amount_in_inr * 100), # Razorpay expects paise
+            "currency": "INR",
+            "payment_capture": 1
+        }
+        order = client.order.create(data=data)
+        return order
+    except Exception as e:
+        print(f"[Razorpay] Error creating order: {e}")
+        return None
+
+def verify_razorpay_signature(params: dict) -> bool:
+    """Verify the signature returned by Razorpay checkout."""
+    if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
+        return False
+        
+    try:
+        import razorpay
+        client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
+        # This will raise an error if verification fails
+        client.utility.verify_payment_signature(params)
+        return True
+    except Exception:
+        return False
 

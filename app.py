@@ -14,7 +14,7 @@ import streamlit as st
 # ── Page config ───────────────────────────────────────────────
 st.set_page_config(
     page_title="FoodBridge — Community Food Redistribution",
-    page_icon="🌉",
+    page_icon="🥘",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -51,7 +51,6 @@ def render_sidebar():
         # Logo
         st.markdown("""
         <div style="text-align:center;padding:1rem 0 1.5rem;">
-            <div style="font-size:2.4rem;filter:drop-shadow(0 0 14px rgba(52,211,153,0.55));">🌉</div>
             <div style="font-size:1.35rem;font-weight:800;font-family:'Space Grotesk',sans-serif;
                         background:linear-gradient(135deg,#34D399,#6366F1);
                         -webkit-background-clip:text;-webkit-text-fill-color:transparent;">
@@ -87,6 +86,8 @@ def render_sidebar():
             st.page_link("pages/03_Admin.py", label="🛡️ Admin Dashboard")
         st.page_link("pages/04_Route_Optimizer.py", label="🗺️ Route Optimizer")
         st.page_link("pages/05_Feedback.py", label="💬 Feedback")
+        if role in ("admin", "donor"):
+            st.page_link("pages/06_Spoilage_Detector.py", label="🧪 Spoilage Detector")
 
         st.markdown("<hr>", unsafe_allow_html=True)
         if st.button("🚪 Sign Out", use_container_width=True):
@@ -124,7 +125,6 @@ def render_login():
         # ── Hero section ────────────────────────────────────────
         st.markdown("""
         <div style="text-align:center;padding:2.5rem 0 1.8rem;">
-            <div style="font-size:3.5rem;filter:drop-shadow(0 0 18px rgba(52,211,153,0.6));">🌉</div>
             <div style="font-size:2.2rem;font-weight:900;font-family:'Space Grotesk',sans-serif;
                         background:linear-gradient(135deg,#34D399,#6366F1);
                         -webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-top:0.4rem;">
@@ -156,7 +156,7 @@ def render_login():
 
         # ── Login button (CTA) ───────────────────────────────────
         if not st.session_state.show_login_form:
-            btn_label = "🔐 Sign In to FoodBridge"
+            btn_label = "Sign In to FoodBridge"
             if st.button(btn_label, use_container_width=True, key="open_login_btn"):
                 st.session_state.show_login_form = True
                 st.rerun()
@@ -192,7 +192,7 @@ def render_login():
                 </div>
                 """, unsafe_allow_html=True)
 
-            tab_in, tab_up = st.tabs(["🔐 Sign In", "✨ Register"])
+            tab_in, tab_up = st.tabs(["Sign In", "✨ Register"])
 
             # ── SIGN IN ──────────────────────────────────────────
             with tab_in:
@@ -341,6 +341,8 @@ def render_home():
         if role == "admin":
             actions.append(("🛡️", "Admin Console", "Monitor platform", "pages/03_Admin.py"))
         actions.append(("🗺️", "Route Optimizer", "Plan delivery routes", "pages/04_Route_Optimizer.py"))
+        if role in ("admin", "donor"):
+            actions.append(("🧪", "Spoilage Detector", "AI food freshness check", "pages/06_Spoilage_Detector.py"))
 
         for em, title, sub, page in actions:
             st.markdown(f"""<div class="glass-card" style="margin-bottom:0.7rem;padding:1rem;">

@@ -100,11 +100,12 @@ section[data-testid="stSidebar"] * { color: #E4EDFF !important; }
     background: rgba(255,255,255,0.045);
     border: 1px solid rgba(255,255,255,0.09);
     border-radius: 18px;
-    padding: 1.4rem 1.6rem;
+    padding: 1.1rem 0.8rem;
     text-align: center;
     backdrop-filter: blur(18px);
     transition: transform 0.25s ease, box-shadow 0.25s ease;
     position: relative; overflow: hidden;
+    min-width: 0;
 }
 .kpi-card::before {
     content:''; position:absolute; bottom:0; left:0; right:0; height:2px;
@@ -113,9 +114,9 @@ section[data-testid="stSidebar"] * { color: #E4EDFF !important; }
 }
 @keyframes shimmer { 0%{background-position:0%} 100%{background-position:200%} }
 .kpi-card:hover { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(52,211,153,0.12); }
-.kpi-label { font-size: 0.75rem; font-weight: 600; color: rgba(228,237,255,0.5); text-transform: uppercase; letter-spacing: 0.1em; }
-.kpi-value { font-size: 2.1rem; font-weight: 900; color: #34D399; margin: 0.3rem 0 0; font-family: 'Space Grotesk', sans-serif; line-height: 1; }
-.kpi-sub   { font-size: 0.73rem; color: rgba(228,237,255,0.38); margin-top: 0.3rem; }
+.kpi-label { font-size: 0.7rem; font-weight: 600; color: rgba(228,237,255,0.5); text-transform: uppercase; letter-spacing: 0.1em; }
+.kpi-value { font-size: 1.65rem; font-weight: 900; color: #34D399; margin: 0.2rem 0 0; font-family: 'Space Grotesk', sans-serif; line-height: 1.1; word-wrap: break-word; }
+.kpi-sub   { font-size: 0.68rem; color: rgba(228,237,255,0.38); margin-top: 0.2rem; }
 .kpi-delta { font-size: 0.78rem; font-weight: 600; margin-top: 0.4rem; }
 .kpi-delta.up { color: #34D399; }
 .kpi-delta.down { color: #F87171; }
@@ -184,18 +185,32 @@ section[data-testid="stSidebar"] * { color: #E4EDFF !important; }
 .stButton > button:active { transform: translateY(0) !important; }
 
 /* ── FORM INPUTS ─────────────────────────────────────────────── */
-[data-testid="stTextInput"] input,
-[data-testid="stSelectbox"] select,
-[data-testid="stTextArea"] textarea,
-[data-testid="stNumberInput"] input {
+div[data-baseweb="input"] {
     background: rgba(255,255,255,0.05) !important;
     border: 1px solid rgba(255,255,255,0.12) !important;
     border-radius: 10px !important;
+}
+div[data-baseweb="input"] div {
+    background-color: transparent !important;
+}
+div[data-baseweb="input"] input,
+div[data-baseweb="input"] textarea {
+    background: transparent !important;
     color: #E4EDFF !important;
     font-family: 'Inter', sans-serif !important;
 }
+[data-testid="stNumberInput"] button {
+    background: transparent !important;
+    color: #E4EDFF !important;
+    border: none !important;
+}
+[data-testid="stNumberInput"] button:hover {
+    color: #34D399 !important;
+    background: rgba(255,255,255,0.05) !important;
+}
 [data-testid="stTextInput"] input:focus,
-[data-testid="stTextArea"] textarea:focus {
+[data-testid="stTextArea"] textarea:focus,
+[data-testid="stNumberInput"] div[data-baseweb="input"]:focus-within {
     border-color: rgba(52,211,153,0.5) !important;
     box-shadow: 0 0 0 3px rgba(52,211,153,0.1) !important;
 }

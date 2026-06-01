@@ -9,6 +9,7 @@
 # ============================================================
 
 import streamlit as st
+import time
 st.set_page_config(page_title="Admin Dashboard · FoodBridge", page_icon="🛡️", layout="wide")
 
 import plotly.graph_objects as go
@@ -19,9 +20,11 @@ from datetime import datetime, timezone, timedelta
 from firebase_config import (
     get_all_listings, get_all_users,
     get_all_transactions, get_platform_stats,
-    update_listing_status, delete_food_listing,
+    update_listing_status, delete_food_listing, purge_food_listing,
     archive_food_listing, get_archived_listings, restore_archived_listing,
-    get_all_feedback
+    get_all_feedback, delete_feedback,
+    get_archived_notifications, purge_notification,
+    clear_all_transactions, delete_user
 )
 from styles import get_css, render_kpi
 
@@ -41,14 +44,13 @@ if st.session_state.get("user_role") != "admin":
 with st.sidebar:
     st.markdown("""
     <div style="text-align:center;padding:0.8rem 0 1.2rem;">
-        <div style="font-size:1.8rem;">🌉</div>
         <div style="font-size:1rem;font-weight:800;font-family:'Space Grotesk',sans-serif;
                     background:linear-gradient(135deg,#34D399,#6366F1);
                     -webkit-background-clip:text;-webkit-text-fill-color:transparent;">FoodBridge</div>
     </div>""", unsafe_allow_html=True)
 
     st.markdown("""<div class="sidebar-user">
-        <div class="su-name">🛡️ Admin Alex</div>
+        <div class="su-name">🛡️ Admin Atha</div>
         <div class="su-role">Administrator</div>
     </div>""", unsafe_allow_html=True)
 
@@ -58,6 +60,7 @@ with st.sidebar:
     st.page_link("pages/03_Admin.py", label="🛡️ Admin Dashboard")
     st.page_link("pages/04_Route_Optimizer.py", label="🗺️ Route Optimizer")
     st.page_link("pages/05_Feedback.py", label="💬 Feedback")
+    st.page_link("pages/06_Spoilage_Detector.py", label="🧪 Spoilage Detector")
     st.markdown("<hr>", unsafe_allow_html=True)
     if st.button("🚪 Sign Out", use_container_width=True):
         for k in list(st.session_state.keys()): del st.session_state[k]
@@ -81,8 +84,10 @@ listings = get_all_listings(200)
 users    = get_all_users()
 txs      = get_all_transactions(200)
 
-# ── KPI Row ───────────────────────────────────────────────────
-k = st.columns(6)
+# ── KPI Row (2 rows of 3 columns for better fit) ────────────────
+k_row1 = st.columns(3)
+k_row2 = st.columns(3)
+
 kpi_data = [
     ("Total Users",    str(stats["total_users"]),   "Registered"),
     ("Total Listings", str(stats["total_listings"]), "All time"),
@@ -91,9 +96,11 @@ kpi_data = [
     ("Meals Saved",    f"{stats['meals_saved']:,}",  "Est. meals"),
     ("Platform Rev.",  f"₹{stats['total_revenue']:,.2f}", "Total earned"),
 ]
-for col, (label, value, sub) in zip(k, kpi_data):
-    with col:
-        col.markdown(render_kpi(label, value, sub), unsafe_allow_html=True)
+
+for i, (label, value, sub) in enumerate(kpi_data):
+    target_row = k_row1 if i < 3 else k_row2
+    with target_row[i % 3]:
+        st.markdown(render_kpi(label, value, sub), unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -165,6 +172,20 @@ with tab_overview:
         )
         st.plotly_chart(fig_rev, use_container_width=True)
 
+    # ── Danger Zone ─────────────────────────────────────────────
+    st.markdown("<br><hr>", unsafe_allow_html=True)
+    with st.expander("⚠️ Admin Danger Zone"):
+        st.markdown("### Reset Transaction History")
+        st.warning("This will permanently delete all records of payments and earnings. This action cannot be undone.")
+        if st.checkbox("I understand and want to clear all history"):
+            if st.button("🗑️ Reset All Transactions", type="primary"):
+                if clear_all_transactions():
+                    st.success("History cleared successfully!")
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.error("Failed to clear history.")
+
     # Food type distribution
     ft_counts = {}
     for l in listings:
@@ -234,7 +255,7 @@ with tab_listings:
     # Quick admin actions
     st.markdown("<hr>", unsafe_allow_html=True)
     st.markdown("**⚡ Quick Admin Actions**")
-    col_a1, col_a2, col_a3 = st.columns(3)
+    col_a1, col_a2, col_a3, col_a4 = st.columns(4)
     with col_a1:
         lid_input = st.text_input("Listing ID (partial)", key="admin_lid")
     with col_a2:
@@ -248,7 +269,20 @@ with tab_listings:
                 st.success(f"✅ Updated {matches[0]['food_name']} → {new_status}")
                 st.rerun()
             else:
-                st.error("No listing found with that ID prefix.")
+                st.error("No matching ID found.")
+    with col_a4:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🗑️ Delete Listing", use_container_width=True, type="secondary"):
+            if not lid_input:
+                st.error("Please enter a Listing ID.")
+            else:
+                matches = [l for l in listings if l["listing_id"].startswith(lid_input)]
+                if matches:
+                    delete_food_listing(matches[0]["listing_id"])
+                    st.success(f"🗑️ Deleted {matches[0]['food_name']}")
+                    st.rerun()
+                else:
+                    st.error("No matching ID found.")
 
     # ── Cleanup: archive completed listings ───────────────────
     st.markdown("<hr>", unsafe_allow_html=True)
@@ -369,6 +403,32 @@ with tab_users:
         } for u in users])
         st.dataframe(df_u, use_container_width=True, hide_index=True)
 
+    # ── User Actions ─────────────────────────────────────────────
+    st.markdown("<hr>", unsafe_allow_html=True)
+    st.markdown("#### 🛡️ User Management Actions")
+    ucol1, ucol2 = st.columns([2, 1])
+    with ucol1:
+        u_to_del = st.text_input("Enter User Email to Delete", placeholder="e.g. test_receiver@gmail.com", help="This will permanently delete their profile.")
+    with ucol2:
+        st.markdown("<div style='height:1.75rem'></div>", unsafe_allow_html=True)
+        if st.button("🗑️ Permanent Delete User", use_container_width=True, type="secondary"):
+            if not u_to_del:
+                st.error("Please enter a user email.")
+            elif u_to_del == st.session_state.get("user_email"):
+                st.warning("⚠️ You cannot delete your own account while logged in.")
+            else:
+                # Find user by email
+                target_user = next((u for u in users if u.get("email") == u_to_del), None)
+                if target_user:
+                    if delete_user(target_user["uid"]):
+                        st.success(f"✅ User '{u_to_del}' has been permanently removed.")
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error("Failed to delete user profile. Check Firebase permissions.")
+                else:
+                    st.error("User not found in database.")
+
 
 # ════════════════════════════════════════════════════════════
 # TAB 4 — REVENUE
@@ -418,6 +478,16 @@ with tab_revenue:
         st.dataframe(df_tx_disp, use_container_width=True, hide_index=True)
     else:
         st.info("No transactions recorded yet.", icon="💳")
+
+    st.markdown("<br><hr>", unsafe_allow_html=True)
+    with st.expander("⚠️ Danger Zone: Reset Revenue"):
+        st.warning("This will permanently clear all transaction logs. Use with caution.")
+        if st.checkbox("Confirm Reset History", key="confirm_reset_rev_tab"):
+            if st.button("🗑️ Wipe All Transactions", key="wipe_btn_rev_tab"):
+                if clear_all_transactions():
+                    st.success("Revenue history wiped.")
+                    time.sleep(1)
+                    st.rerun()
 
 
 # ════════════════════════════════════════════════════════════
@@ -602,8 +672,39 @@ with tab_archive:
                 st.markdown("<div style='height:0.55rem'></div>", unsafe_allow_html=True)
                 if st.button("🗑️", key=f"purge_{lid}", use_container_width=True,
                              help=f"Permanently delete '{name}'"):
-                    delete_food_listing(lid)
+                    purge_food_listing(lid)
                     st.toast(f"Purged: {name}", icon="🗑️")
+                    st.rerun()
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.info("💡 **Retention Policy:** Archived listings are kept for 30 days before permanent automatic cleanup. You can restore them to the active board anytime before then.", icon="📅")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("#### 🔔 Archived Notifications")
+    arc_notifs = get_archived_notifications()
+    if not arc_notifs:
+        st.write("No archived notifications.")
+    else:
+        for an in arc_notifs:
+            anid = an.get("notif_id")
+            title = an.get("title", "No Title")
+            msg = an.get("message", "")
+            arc_at = str(an.get("archived_at", ""))[:16]
+            
+            acol1, acol2 = st.columns([8, 1])
+            with acol1:
+                st.markdown(f"""
+                <div class="glass-card" style="padding:0.6rem 1rem; margin-bottom:0.3rem; border-left:3px solid #6366F1;">
+                    <div style="font-weight:700; font-size:0.85rem;">{title}</div>
+                    <div style="font-size:0.75rem; color:rgba(228,237,255,0.6);">{msg}</div>
+                    <div style="font-size:0.65rem; color:rgba(228,237,255,0.3); margin-top:0.2rem;">Archived: {arc_at}</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with acol2:
+                st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
+                if st.button("🗑️", key=f"purge_notif_{anid}", help="Permanently delete notification"):
+                    purge_notification(anid)
+                    st.toast("Notification permanently purged")
                     st.rerun()
 
 
@@ -625,20 +726,32 @@ with tab_feedback:
         st.markdown("<hr>", unsafe_allow_html=True)
         
         for fb in feedbacks:
+            fb_id = fb.get("feedback_id")
             stars = "⭐" * fb.get("rating", 0)
             role_badge = "🍽️ Donor" if fb.get("role") == "donor" else "🤝 Receiver"
             time_str = str(fb.get("timestamp", ""))[:16]
             
-            st.markdown(f"""
-            <div class="glass-card" style="padding: 1.5rem; margin-bottom: 1rem;">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <div>
-                        <strong>{fb.get('user_name', 'Anonymous')}</strong> 
-                        <span style="font-size:0.8rem; background:rgba(255,255,255,0.1); padding:0.2rem 0.5rem; border-radius:10px; margin-left:0.5rem;">{role_badge}</span>
+            col_fb_text, col_fb_del = st.columns([6, 1])
+            with col_fb_text:
+                st.markdown(f"""
+                <div class="glass-card" style="padding:1.2rem;margin-bottom:1rem;border-left:4px solid #6366F1;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;">
+                        <div style="font-weight:700;color:#fff;">{fb.get('user_name')} &nbsp; 
+                            <span style="background:rgba(255,255,255,0.08);padding:2px 8px;border-radius:12px;font-size:0.7rem;font-weight:400;">
+                                {role_badge}
+                            </span>
+                        </div>
+                        <div style="font-size:0.75rem;color:rgba(228,237,255,0.4);">{time_str}</div>
                     </div>
-                    <div style="color:rgba(228,237,255,0.5); font-size:0.8rem;">{time_str}</div>
+                    <div style="margin-bottom:0.8rem;font-size:1.1rem;">{stars}</div>
+                    <div style="color:rgba(228,237,255,0.85);font-style:italic;line-height:1.5;">
+                        "{fb.get('message')}"
+                    </div>
                 </div>
-                <div style="font-size:1.2rem; margin:0.5rem 0;">{stars}</div>
-                <div style="color:rgba(228,237,255,0.9); font-size:0.95rem; line-height:1.5;">"{fb.get('message', '')}"</div>
-            </div>
-            """, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
+            with col_fb_del:
+                st.markdown("<div style='height:1.2rem'></div>", unsafe_allow_html=True)
+                if st.button("🗑️", key=f"del_fb_{fb_id}", use_container_width=True, help="Delete this feedback"):
+                    delete_feedback(fb_id)
+                    st.toast("Feedback deleted")
+                    st.rerun()
