@@ -55,8 +55,8 @@ def _init_firebase():
             cred = credentials.Certificate(cred_dict)
             firebase_admin.initialize_app(cred, {"projectId": PROJECT_ID})
             return
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[Firebase] Streamlit secrets error: {e}")
     # 2. Env-var JSON
     json_env = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
     if json_env:
