@@ -42,6 +42,17 @@ RAZORPAY_KEY_SECRET  = _env("RAZORPAY_KEY_SECRET", "")
 
 FIREBASE_INIT_ERROR = None
 
+def _clean_key(pk):
+    if isinstance(pk, str):
+        pk = pk.strip()
+        # Remove any outer double/single quotes that might have been copied/pasted accidentally
+        if pk.startswith('"') and pk.endswith('"'):
+            pk = pk[1:-1].strip()
+        elif pk.startswith("'") and pk.endswith("'"):
+            pk = pk[1:-1].strip()
+        pk = pk.replace("\\n", "\n")
+    return pk
+
 # ── Firebase init (singleton) ────────────────────────────────
 def _init_firebase():
     global FIREBASE_INIT_ERROR
@@ -54,7 +65,7 @@ def _init_firebase():
             raw = st.secrets["FIREBASE_SERVICE_ACCOUNT_JSON"]
             cred_dict = dict(raw) if not isinstance(raw, str) else json.loads(raw)
             if "private_key" in cred_dict:
-                cred_dict["private_key"] = cred_dict["private_key"].replace("\\n", "\n")
+                cred_dict["private_key"] = _clean_key(cred_dict["private_key"])
             cred = credentials.Certificate(cred_dict)
             firebase_admin.initialize_app(cred, {"projectId": PROJECT_ID})
             return
@@ -69,7 +80,7 @@ def _init_firebase():
         try:
             cred_dict = json.loads(json_env)
             if "private_key" in cred_dict:
-                cred_dict["private_key"] = cred_dict["private_key"].replace("\\n", "\n")
+                cred_dict["private_key"] = _clean_key(cred_dict["private_key"])
             cred = credentials.Certificate(cred_dict)
             firebase_admin.initialize_app(cred, {"projectId": PROJECT_ID})
             return
