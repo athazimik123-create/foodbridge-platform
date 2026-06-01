@@ -186,7 +186,7 @@ def render_login():
             else:
                 import firebase_config
                 if firebase_config.db is None:
-                    st.error("🔴 Firebase Database connection failed. Running in MOCK Mode. Check your Secrets config.")
+                    st.error(f"🔴 Firebase Database connection failed. Running in MOCK Mode. Error: {firebase_config.FIREBASE_INIT_ERROR}")
                 else:
                     st.markdown("""
                     <div style="background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.2);
@@ -298,7 +298,7 @@ def render_home():
 
     import firebase_config
     if firebase_config.db is None:
-        st.error("🔴 Firebase Database connection failed. Running in MOCK Mode. Check your Secrets config.")
+        st.error(f"🔴 Firebase Database connection failed. Running in MOCK Mode. Error: {firebase_config.FIREBASE_INIT_ERROR}")
     else:
         st.info(f"🔧 Diagnostic: Logged in as `{st.session_state.user_email}` | UID: `{st.session_state.uid}` | Role: `{st.session_state.user_role}` | Name: `{st.session_state.user_name}`")
 

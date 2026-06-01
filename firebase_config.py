@@ -40,8 +40,11 @@ GOOGLE_MAPS_API_KEY  = _env("GOOGLE_MAPS_API_KEY", "")
 RAZORPAY_KEY_ID      = _env("RAZORPAY_KEY_ID", "")
 RAZORPAY_KEY_SECRET  = _env("RAZORPAY_KEY_SECRET", "")
 
+FIREBASE_INIT_ERROR = None
+
 # ── Firebase init (singleton) ────────────────────────────────
 def _init_firebase():
+    global FIREBASE_INIT_ERROR
     if firebase_admin._apps:
         return
     # 1. Streamlit secrets JSON
@@ -55,7 +58,10 @@ def _init_firebase():
             cred = credentials.Certificate(cred_dict)
             firebase_admin.initialize_app(cred, {"projectId": PROJECT_ID})
             return
+        else:
+            FIREBASE_INIT_ERROR = "FIREBASE_SERVICE_ACCOUNT_JSON key not found in st.secrets"
     except Exception as e:
+        FIREBASE_INIT_ERROR = f"Secrets load error: {e}"
         print(f"[Firebase] Streamlit secrets error: {e}")
     # 2. Env-var JSON
     json_env = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
@@ -84,7 +90,10 @@ _init_firebase()
 def get_db():
     try:
         return firestore.client()
-    except Exception:
+    except Exception as e:
+        global FIREBASE_INIT_ERROR
+        if not FIREBASE_INIT_ERROR:
+            FIREBASE_INIT_ERROR = f"Firestore client error: {e}"
         return None
 
 
