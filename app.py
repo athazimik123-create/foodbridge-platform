@@ -39,7 +39,7 @@ for k, v in _DEFAULTS.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-IS_MOCK = (FIREBASE_WEB_API_KEY == "DEMO_KEY")
+IS_MOCK = False  # Force live mode for deployment
 
 
 # ════════════════════════════════════════════════════════════
