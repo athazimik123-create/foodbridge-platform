@@ -43,14 +43,23 @@ RAZORPAY_KEY_SECRET  = _env("RAZORPAY_KEY_SECRET", "")
 FIREBASE_INIT_ERROR = None
 
 def _clean_key(pk):
-    if isinstance(pk, str):
-        pk = pk.strip()
-        # Remove any outer double/single quotes that might have been copied/pasted accidentally
-        if pk.startswith('"') and pk.endswith('"'):
+    """Aggressively clean a PEM private key string from various TOML/JSON quoting issues."""
+    if not isinstance(pk, str):
+        return pk
+    pk = pk.strip()
+    # Strip outer quotes (double or single) that may have been copy-pasted
+    for q in ('"', "'"):
+        if pk.startswith(q) and pk.endswith(q):
             pk = pk[1:-1].strip()
-        elif pk.startswith("'") and pk.endswith("'"):
-            pk = pk[1:-1].strip()
-        pk = pk.replace("\\n", "\n")
+    # Replace literal two-char \n sequences with real newlines
+    pk = pk.replace("\\n", "\n")
+    # Also handle double-escaped \\n → \n
+    pk = pk.replace("\\\\n", "\n")
+    # Remove any carriage returns
+    pk = pk.replace("\r", "")
+    # Collapse any runs of multiple newlines to single
+    while "\n\n" in pk:
+        pk = pk.replace("\n\n", "\n")
     return pk
 
 # ── Firebase init (singleton) ────────────────────────────────
@@ -66,8 +75,14 @@ def _init_firebase():
             cred_dict = dict(raw) if not isinstance(raw, str) else json.loads(raw)
             if "private_key" in cred_dict:
                 cred_dict["private_key"] = _clean_key(cred_dict["private_key"])
+                pk = cred_dict["private_key"]
+                # Diagnostic: log what the key looks like
+                print(f"[Firebase] private_key starts with: {repr(pk[:60])}")
+                print(f"[Firebase] private_key ends with: {repr(pk[-60:])}")
+                print(f"[Firebase] private_key length: {len(pk)}, newline count: {pk.count(chr(10))}")
             cred = credentials.Certificate(cred_dict)
             firebase_admin.initialize_app(cred, {"projectId": PROJECT_ID})
+            print("[Firebase] ✅ Initialized from Streamlit secrets!")
             return
         else:
             FIREBASE_INIT_ERROR = "FIREBASE_SERVICE_ACCOUNT_JSON key not found in st.secrets"
