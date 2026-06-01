@@ -184,13 +184,17 @@ def render_login():
                 </div>
                 """, unsafe_allow_html=True)
             else:
-                st.markdown("""
-                <div style="background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.2);
-                            border-radius:12px;padding:0.85rem 1rem;margin-bottom:1.2rem;
-                            font-size:0.82rem;color:rgba(228,237,255,0.7);">
-                    🔥 <b style="color:#818CF8;">Live Mode</b> — Connected to Firebase.
-                </div>
-                """, unsafe_allow_html=True)
+                import firebase_config
+                if firebase_config.db is None:
+                    st.error("🔴 Firebase Database connection failed. Running in MOCK Mode. Check your Secrets config.")
+                else:
+                    st.markdown("""
+                    <div style="background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.2);
+                                border-radius:12px;padding:0.85rem 1rem;margin-bottom:1.2rem;
+                                font-size:0.82rem;color:rgba(228,237,255,0.7);">
+                        🔥 <b style="color:#818CF8;">Live Mode</b> — Connected to Firebase.
+                    </div>
+                    """, unsafe_allow_html=True)
 
             tab_in, tab_up = st.tabs(["Sign In", "✨ Register"])
 
@@ -291,6 +295,12 @@ def render_home():
         <div class="live-badge"><span class="pulse-dot"></span>LIVE DATA</div>
     </div>
     """, unsafe_allow_html=True)
+
+    import firebase_config
+    if firebase_config.db is None:
+        st.error("🔴 Firebase Database connection failed. Running in MOCK Mode. Check your Secrets config.")
+    else:
+        st.info(f"🔧 Diagnostic: Logged in as `{st.session_state.user_email}` | UID: `{st.session_state.uid}` | Role: `{st.session_state.user_role}` | Name: `{st.session_state.user_name}`")
 
     # KPI Row
     k1, k2, k3, k4, k5 = st.columns(5)
