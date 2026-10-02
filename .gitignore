@@ -1,3 +1,8 @@
+# ── Backup & Copy Files ───────────────────────────────────────
+* - Copy*
+*-Copy*
+*- Copy.*
+
 # ── Secrets & credentials (NEVER commit these) ───────────────
 .env
 serviceAccountKey.json

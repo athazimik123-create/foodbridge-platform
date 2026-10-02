@@ -2,15 +2,15 @@
 # pages/03_Admin.py — Admin Dashboard
 # ============================================================
 # Admin can:
-#  • Monitor all platform activity (listings, users, transactions)
-#  • Manage listing statuses
-#  • View revenue analytics with charts
-#  • See CO2 & impact metrics
+# • Monitor all platform activity (listings, users, transactions)
+# • Manage listing statuses
+# • View revenue analytics with charts
+# • See CO2 & impact metrics
 # ============================================================
 
 import streamlit as st
 import time
-st.set_page_config(page_title="Admin Dashboard · FoodBridge", page_icon="🛡️", layout="wide")
+st.set_page_config(page_title="Admin Dashboard · FoodBridge", page_icon=None, layout="wide")
 
 import plotly.graph_objects as go
 import plotly.express as px
@@ -33,11 +33,11 @@ st.markdown(get_css(), unsafe_allow_html=True)
 # ── Auth guard ────────────────────────────────────────────────
 if not st.session_state.get("authenticated"):
     st.warning("Please sign in.")
-    st.page_link("app.py", label="← Login")
+    st.page_link("app.py", label="Login")
     st.stop()
 if st.session_state.get("user_role") != "admin":
-    st.error("🔒 Admin access only.")
-    st.page_link("app.py", label="← Go Home")
+    st.error("Admin access only.")
+    st.page_link("app.py", label="Go Home")
     st.stop()
 
 # ── Sidebar ───────────────────────────────────────────────────
@@ -50,19 +50,19 @@ with st.sidebar:
     </div>""", unsafe_allow_html=True)
 
     st.markdown("""<div class="sidebar-user">
-        <div class="su-name">🛡️ Admin Atha</div>
+        <div class="su-name">Admin Atha</div>
         <div class="su-role">Administrator</div>
     </div>""", unsafe_allow_html=True)
 
-    st.page_link("app.py", label="🏠 Home")
-    st.page_link("pages/01_Donor.py", label="🍽️ Donor Dashboard")
-    st.page_link("pages/02_Receiver.py", label="🤝 Receiver Portal")
-    st.page_link("pages/03_Admin.py", label="🛡️ Admin Dashboard")
-    st.page_link("pages/04_Route_Optimizer.py", label="🗺️ Route Optimizer")
-    st.page_link("pages/05_Feedback.py", label="💬 Feedback")
-    st.page_link("pages/06_Spoilage_Detector.py", label="🧪 Spoilage Detector")
+    st.page_link("app.py", label="Home")
+    st.page_link("pages/01_Donor.py", label="Donor Dashboard")
+    st.page_link("pages/02_Receiver.py", label="Receiver Portal")
+    st.page_link("pages/03_Admin.py", label="Admin Dashboard")
+    st.page_link("pages/04_Route_Optimizer.py", label="Route Optimizer")
+    st.page_link("pages/05_Feedback.py", label="Feedback")
+    st.page_link("pages/06_Spoilage_Detector.py", label="Spoilage Detector")
     st.markdown("<hr>", unsafe_allow_html=True)
-    if st.button("🚪 Sign Out", use_container_width=True):
+    if st.button("Sign Out", use_container_width=True):
         for k in list(st.session_state.keys()): del st.session_state[k]
         st.switch_page("app.py")
 
@@ -71,7 +71,7 @@ now_str = datetime.now(timezone.utc).strftime("%b %d, %Y · %H:%M UTC")
 st.markdown(f"""
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:0.8rem;">
     <div>
-        <div class="section-title">🛡️ Admin Dashboard</div>
+        <div class="section-title">Admin Dashboard</div>
         <div class="section-sub">Full platform control & analytics · {now_str}</div>
     </div>
     <div class="live-badge"><span class="pulse-dot"></span>LIVE ADMIN</div>
@@ -79,26 +79,26 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ── Load data ─────────────────────────────────────────────────
-stats    = get_platform_stats()
+stats = get_platform_stats()
 listings = get_all_listings(200)
-users    = get_all_users()
-txs      = get_all_transactions(200)
+users = get_all_users()
+txs = get_all_transactions(200)
 
 # ── KPI Row (2 rows of 3 columns for better fit) ────────────────
 k_row1 = st.columns(3)
 k_row2 = st.columns(3)
 
 kpi_data = [
-    ("Total Users",    str(stats["total_users"]),   "Registered"),
+    ("Total Users", str(stats["total_users"]), "Registered"),
     ("Total Listings", str(stats["total_listings"]), "All time"),
-    ("Available",      str(stats["available"]),      "Open listings"),
-    ("Delivered",      str(stats["delivered"]),      "Completed"),
-    ("Meals Saved",    f"{stats['meals_saved']:,}",  "Est. meals"),
-    ("Platform Rev.",  f"₹{stats['total_revenue']:,.2f}", "Total earned"),
+    ("Available", str(stats["available"]), "Open listings"),
+    ("Delivered", str(stats["delivered"]), "Completed"),
+    ("Meals Saved", f"{stats['meals_saved']:,}", "Est. meals"),
+    ("Platform Rev.", f"₹{stats['total_revenue']:,.2f}", "Total earned"),
 ]
 
 for i, (label, value, sub) in enumerate(kpi_data):
-    target_row = k_row1 if i < 3 else k_row2
+    target_row = k_row1 if i< 3 else k_row2
     with target_row[i % 3]:
         st.markdown(render_kpi(label, value, sub), unsafe_allow_html=True)
 
@@ -108,7 +108,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 # TABS
 # ════════════════════════════════════════════════════════════
 tab_overview, tab_listings, tab_users, tab_revenue, tab_impact, tab_archive, tab_feedback = st.tabs([
-    "📊 Overview", "🥬 Listings", "👥 Users", "💰 Revenue", "🌱 Impact", "🗂️ Archive", "💬 Feedback"
+    "Overview", "Listings", "Users", "Revenue", "Impact", "Archive", "Feedback"
 ])
 
 
@@ -151,13 +151,13 @@ with tab_overview:
     with col_r:
         # Revenue breakdown bar
         rev_labels = ["Subscriptions", "Logistics Fees", "CSR Credits"]
-        rev_vals   = [stats["sub_rev"], stats["logistics_rev"], stats["csr_rev"]]
+        rev_vals = [stats["sub_rev"], stats["logistics_rev"], stats["csr_rev"]]
         rev_colors = ["#34D399", "#818CF8", "#FB923C"]
 
         fig_rev = go.Figure(go.Bar(
             x=rev_labels, y=rev_vals,
             marker=dict(color=rev_colors, opacity=0.85),
-            text=[f"₹{v:.2f}" for v in rev_vals],
+            text=[f"₹{v:.2f}"for v in rev_vals],
             textposition="outside",
             textfont=dict(color="#E4EDFF"),
         ))
@@ -174,11 +174,11 @@ with tab_overview:
 
     # ── Danger Zone ─────────────────────────────────────────────
     st.markdown("<br><hr>", unsafe_allow_html=True)
-    with st.expander("⚠️ Admin Danger Zone"):
+    with st.expander("Admin Danger Zone"):
         st.markdown("### Reset Transaction History")
         st.warning("This will permanently delete all records of payments and earnings. This action cannot be undone.")
         if st.checkbox("I understand and want to clear all history"):
-            if st.button("🗑️ Reset All Transactions", type="primary"):
+            if st.button("Reset All Transactions", type="primary"):
                 if clear_all_transactions():
                     st.success("History cleared successfully!")
                     time.sleep(1)
@@ -237,14 +237,14 @@ with tab_listings:
 
     if filtered_l:
         df_l = pd.DataFrame([{
-            "ID":          l["listing_id"][:8] + "…",
-            "Food":        l.get("food_name",""),
-            "Type":        l.get("food_type",""),
-            "Qty (kg)":    l.get("quantity_kg",0),
-            "Donor":       l.get("donor_name",""),
-            "Status":      l.get("status",""),
-            "Address":     l.get("address","")[:35],
-            "Created":     str(l.get("created_at",""))[:16],
+            "ID": l["listing_id"][:8] + "…",
+            "Food": l.get("food_name",""),
+            "Type": l.get("food_type",""),
+            "Qty (kg)": l.get("quantity_kg",0),
+            "Donor": l.get("donor_name",""),
+            "Status": l.get("status",""),
+            "Address": l.get("address","")[:35],
+            "Created": str(l.get("created_at",""))[:16],
         } for l in filtered_l])
         st.dataframe(df_l, use_container_width=True, hide_index=True,
                      column_config={
@@ -254,7 +254,7 @@ with tab_listings:
 
     # Quick admin actions
     st.markdown("<hr>", unsafe_allow_html=True)
-    st.markdown("**⚡ Quick Admin Actions**")
+    st.markdown("** Quick Admin Actions**")
     col_a1, col_a2, col_a3, col_a4 = st.columns(4)
     with col_a1:
         lid_input = st.text_input("Listing ID (partial)", key="admin_lid")
@@ -262,24 +262,24 @@ with tab_listings:
         new_status = st.selectbox("New Status", ["available","requested","in_transit","delivered"])
     with col_a3:
         st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("✏️ Update Status", use_container_width=True):
+        if st.button("Update Status", use_container_width=True):
             matches = [l for l in listings if l["listing_id"].startswith(lid_input)]
             if matches:
                 update_listing_status(matches[0]["listing_id"], new_status)
-                st.success(f"✅ Updated {matches[0]['food_name']} → {new_status}")
+                st.success(f"Updated {matches[0]['food_name']} {new_status}")
                 st.rerun()
             else:
                 st.error("No matching ID found.")
     with col_a4:
         st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("🗑️ Delete Listing", use_container_width=True, type="secondary"):
+        if st.button("Delete Listing", use_container_width=True, type="secondary"):
             if not lid_input:
                 st.error("Please enter a Listing ID.")
             else:
                 matches = [l for l in listings if l["listing_id"].startswith(lid_input)]
                 if matches:
                     delete_food_listing(matches[0]["listing_id"])
-                    st.success(f"🗑️ Deleted {matches[0]['food_name']}")
+                    st.success(f"Deleted {matches[0]['food_name']}")
                     st.rerun()
                 else:
                     st.error("No matching ID found.")
@@ -290,38 +290,38 @@ with tab_listings:
 
     st.markdown(f"""
     <div style="display:flex;align-items:center;gap:0.8rem;margin-bottom:0.6rem;">
-        <div style="font-size:1rem;font-weight:700;color:#E4EDFF;">🗂️ Archive Completed Listings</div>
+        <div style="font-size:1rem;font-weight:700;color:#E4EDFF;">Archive Completed Listings</div>
         <span style="background:rgba(251,146,60,0.15);color:#FB923C;border:1px solid rgba(251,146,60,0.3);
                      padding:2px 10px;border-radius:20px;font-size:0.78rem;font-weight:700;">
             {len(completed)} records
         </span>
     </div>
     <div style="font-size:0.82rem;color:rgba(228,237,255,0.45);margin-bottom:1rem;">
-        Archiving moves listings to the <b style="color:#FB923C;">🗂️ Archive</b> tab where they can be
-        <b style="color:#34D399;">restored</b> if needed, or permanently deleted when you're certain.
+        Archiving moves listings to the<b style="color:#FB923C;">Archive</b>tab where they can be
+        <b style="color:#34D399;">restored</b>if needed, or permanently deleted when you're certain.
     </div>
     """, unsafe_allow_html=True)
 
     if not completed:
-        st.success("✅ No completed listings to archive — list is tidy!", icon="🧹")
+        st.success("No completed listings to archive — list is tidy!")
     else:
         # Bulk archive all
         if not st.session_state.get("confirm_bulk_archive", False):
-            if st.button("🗂️ Archive ALL Completed Listings", key="bulk_arc_btn", type="primary"):
+            if st.button("Archive ALL Completed Listings", key="bulk_arc_btn", type="primary"):
                 st.session_state["confirm_bulk_archive"] = True
                 st.rerun()
         else:
-            st.warning(f"⚠️ Archive all **{len(completed)}** completed listings? They can be restored from the 🗂️ Archive tab.")
+            st.warning(f"Archive all **{len(completed)}** completed listings? They can be restored from the Archive tab.")
             bc1, bc2 = st.columns(2)
             with bc1:
-                if st.button("✅ Yes, Archive All", key="confirm_bulk_arc_yes", use_container_width=True):
+                if st.button("Yes, Archive All", key="confirm_bulk_arc_yes", use_container_width=True):
                     for l in completed:
                         archive_food_listing(l["listing_id"])
                     st.session_state["confirm_bulk_archive"] = False
-                    st.toast(f"🗂️ Archived {len(completed)} listings.", icon="✅")
+                    st.toast(f"Archived {len(completed)} listings.")
                     st.rerun()
             with bc2:
-                if st.button("✖ Cancel", key="confirm_bulk_arc_no", use_container_width=True):
+                if st.button("Cancel", key="confirm_bulk_arc_no", use_container_width=True):
                     st.session_state["confirm_bulk_archive"] = False
                     st.rerun()
 
@@ -330,27 +330,27 @@ with tab_listings:
 
         # Per-listing archive rows
         for listing in completed:
-            lid   = listing["listing_id"]
-            name  = listing.get("food_name", "Unknown")
+            lid = listing["listing_id"]
+            name = listing.get("food_name", "Unknown")
             donor = listing.get("donor_name", "—")
-            qty   = listing.get("quantity_kg", 0)
-            stat  = listing.get("status", "")
-            addr  = listing.get("address", "")[:40]
+            qty = listing.get("quantity_kg", 0)
+            stat = listing.get("status", "")
+            addr = listing.get("address", "")[:40]
             created = str(listing.get("created_at", ""))[:16]
-            stat_color = "#34D399" if stat == "delivered" else "#F87171"
+            stat_color = "#34D399"if stat == "delivered"else"#F87171"
 
             row_left, row_right = st.columns([5, 1])
             with row_left:
                 st.markdown(f"""
-                <div class="glass-card" style="padding:0.75rem 1rem;margin-bottom:0.3rem;
+                <div class="glass-card"style="padding:0.75rem 1rem;margin-bottom:0.3rem;
                              border-left:3px solid {stat_color};
                              display:flex;flex-wrap:wrap;gap:0.5rem 1.5rem;align-items:center;">
                     <div>
                         <div style="font-weight:700;font-size:0.9rem;color:#E4EDFF;">{name}</div>
-                        <div style="font-size:0.75rem;color:rgba(228,237,255,0.45);">📍 {addr}</div>
+                        <div style="font-size:0.75rem;color:rgba(228,237,255,0.45);"> {addr}</div>
                     </div>
-                    <div style="font-size:0.78rem;color:rgba(228,237,255,0.55);">👤 {donor}</div>
-                    <div style="font-size:0.78rem;color:rgba(228,237,255,0.55);">⚖️ {qty} kg</div>
+                    <div style="font-size:0.78rem;color:rgba(228,237,255,0.55);"> {donor}</div>
+                    <div style="font-size:0.78rem;color:rgba(228,237,255,0.55);"> {qty} kg</div>
                     <div style="font-size:0.75rem;color:rgba(228,237,255,0.4);">{created}</div>
                     <span style="background:{stat_color}22;color:{stat_color};border:1px solid {stat_color}55;
                                  padding:2px 10px;border-radius:20px;font-size:0.72rem;font-weight:700;">
@@ -360,10 +360,10 @@ with tab_listings:
                 """, unsafe_allow_html=True)
             with row_right:
                 st.markdown("<div style='height:0.6rem'></div>", unsafe_allow_html=True)
-                if st.button("🗂️", key=f"admin_arc_{lid}", use_container_width=True,
-                             help=f"Archive '{name}'"):
+                if st.button("", key=f"admin_arc_{lid}", use_container_width=True,
+                             help=f"Archive'{name}'"):
                     archive_food_listing(lid)
-                    st.toast(f"Archived: {name}", icon="🗂️")
+                    st.toast(f"Archived: {name}")
                     st.rerun()
 
 
@@ -396,32 +396,32 @@ with tab_users:
 
     with col_ut:
         df_u = pd.DataFrame([{
-            "Name":  u.get("name",""),
+            "Name": u.get("name",""),
             "Email": u.get("email",""),
-            "Role":  u.get("role",""),
-            "Tier":  u.get("subscription_tier","basic"),
+            "Role": u.get("role",""),
+            "Tier": u.get("subscription_tier","basic"),
         } for u in users])
         st.dataframe(df_u, use_container_width=True, hide_index=True)
 
     # ── User Actions ─────────────────────────────────────────────
     st.markdown("<hr>", unsafe_allow_html=True)
-    st.markdown("#### 🛡️ User Management Actions")
+    st.markdown("#### User Management Actions")
     ucol1, ucol2 = st.columns([2, 1])
     with ucol1:
         u_to_del = st.text_input("Enter User Email to Delete", placeholder="e.g. test_receiver@gmail.com", help="This will permanently delete their profile.")
     with ucol2:
         st.markdown("<div style='height:1.75rem'></div>", unsafe_allow_html=True)
-        if st.button("🗑️ Permanent Delete User", use_container_width=True, type="secondary"):
+        if st.button("Permanent Delete User", use_container_width=True, type="secondary"):
             if not u_to_del:
                 st.error("Please enter a user email.")
             elif u_to_del == st.session_state.get("user_email"):
-                st.warning("⚠️ You cannot delete your own account while logged in.")
+                st.warning("You cannot delete your own account while logged in.")
             else:
                 # Find user by email
                 target_user = next((u for u in users if u.get("email") == u_to_del), None)
                 if target_user:
                     if delete_user(target_user["uid"]):
-                        st.success(f"✅ User '{u_to_del}' has been permanently removed.")
+                        st.success(f"User'{u_to_del}'has been permanently removed.")
                         time.sleep(1)
                         st.rerun()
                     else:
@@ -437,9 +437,9 @@ with tab_revenue:
     # Revenue over time (simulated timeline from transactions)
     if txs:
         df_tx = pd.DataFrame([{
-            "date":   str(t.get("timestamp",""))[:10],
+            "date": str(t.get("timestamp",""))[:10],
             "amount": t.get("amount",0),
-            "type":   t.get("type",""),
+            "type": t.get("type",""),
         } for t in txs])
         df_tx["date"] = pd.to_datetime(df_tx["date"], errors="coerce")
         df_agg = df_tx.groupby(["date","type"])["amount"].sum().reset_index()
@@ -447,9 +447,9 @@ with tab_revenue:
         fig_line = px.line(
             df_agg, x="date", y="amount", color="type",
             color_discrete_map={
-                "subscription":  "#34D399",
+                "subscription": "#34D399",
                 "logistics_fee": "#818CF8",
-                "csr_credit":    "#FB923C",
+                "csr_credit": "#FB923C",
             },
             markers=True,
             labels={"amount":"Revenue (₹)", "date":"Date", "type":"Stream"},
@@ -467,23 +467,23 @@ with tab_revenue:
         st.plotly_chart(fig_line, use_container_width=True)
 
         # Transaction log table
-        st.markdown("**📋 Transaction Log**")
+        st.markdown("** Transaction Log**")
         df_tx_disp = pd.DataFrame([{
-            "TX ID":    t.get("tx_id","")[:8]+"…",
-            "Amount":   f"₹{t.get('amount',0):.2f}",
-            "Type":     t.get("type",""),
-            "User":     t.get("user_id","")[:12]+"…",
+            "TX ID": t.get("tx_id","")[:8]+"…",
+            "Amount": f"₹{t.get('amount',0):.2f}",
+            "Type": t.get("type",""),
+            "User": t.get("user_id","")[:12]+"…",
             "Timestamp": str(t.get("timestamp",""))[:16],
         } for t in txs])
         st.dataframe(df_tx_disp, use_container_width=True, hide_index=True)
     else:
-        st.info("No transactions recorded yet.", icon="💳")
+        st.info("No transactions recorded yet.")
 
     st.markdown("<br><hr>", unsafe_allow_html=True)
-    with st.expander("⚠️ Danger Zone: Reset Revenue"):
+    with st.expander("Danger Zone: Reset Revenue"):
         st.warning("This will permanently clear all transaction logs. Use with caution.")
         if st.checkbox("Confirm Reset History", key="confirm_reset_rev_tab"):
-            if st.button("🗑️ Wipe All Transactions", key="wipe_btn_rev_tab"):
+            if st.button("Wipe All Transactions", key="wipe_btn_rev_tab"):
                 if clear_all_transactions():
                     st.success("Revenue history wiped.")
                     time.sleep(1)
@@ -498,14 +498,14 @@ with tab_impact:
 
     imp1, imp2, imp3, imp4 = st.columns(4)
     with imp1:
-        st.markdown(render_kpi("🥗 Total Food", f"{total_kg:.1f} kg", "Submitted to platform"), unsafe_allow_html=True)
+        st.markdown(render_kpi("Total Food", f"{total_kg:.1f} kg", "Submitted to platform"), unsafe_allow_html=True)
     with imp2:
-        st.markdown(render_kpi("🍽️ Meals Saved", f"{stats['meals_saved']:,}", "Est. @ 0.4 kg/meal"), unsafe_allow_html=True)
+        st.markdown(render_kpi("Meals Saved", f"{stats['meals_saved']:,}", "Est. @ 0.4 kg/meal"), unsafe_allow_html=True)
     with imp3:
-        st.markdown(render_kpi("🌿 CO₂ Offset", f"{stats['co2_offset_kg']} kg", "Carbon equivalent"), unsafe_allow_html=True)
+        st.markdown(render_kpi("CO₂ Offset", f"{stats['co2_offset_kg']} kg", "Carbon equivalent"), unsafe_allow_html=True)
     with imp4:
         trees = round(stats["co2_offset_kg"] / 21, 1)
-        st.markdown(render_kpi("🌳 Tree Equiv.", f"{trees}", "Trees planted equiv."), unsafe_allow_html=True)
+        st.markdown(render_kpi("Tree Equiv.", f"{trees}", "Trees planted equiv."), unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -518,10 +518,10 @@ with tab_impact:
         value=total_kg,
         delta={"reference": target_kg * 0.5, "valueformat": ".1f"},
         title={"text": "Platform Food Redistributed (kg)", "font": {"color": "#E4EDFF", "size": 14}},
-        number={"suffix": " kg", "font": {"color": "#34D399", "size": 30}},
+        number={"suffix": "kg", "font": {"color": "#34D399", "size": 30}},
         gauge={
             "axis": {"range": [0, target_kg], "tickfont": {"color": "#E4EDFF"}},
-            "bar":  {"color": "#34D399"},
+            "bar": {"color": "#34D399"},
             "bgcolor": "rgba(255,255,255,0.05)",
             "bordercolor": "rgba(255,255,255,0.1)",
             "steps": [
@@ -540,10 +540,10 @@ with tab_impact:
     st.plotly_chart(fig_gauge, use_container_width=True)
 
     st.markdown(f"""
-    <div class="glass-card" style="text-align:center;padding:1.5rem;margin-top:1rem;">
+    <div class="glass-card"style="text-align:center;padding:1.5rem;margin-top:1rem;">
         <div style="font-size:0.85rem;color:rgba(228,237,255,0.5);">Progress toward 1,000 kg redistribution goal</div>
-        <div class="conf-bar" style="margin:0.8rem auto;max-width:400px;">
-            <div class="conf-fill" style="width:{pct}%;"></div>
+        <div class="conf-bar"style="margin:0.8rem auto;max-width:400px;">
+            <div class="conf-fill"style="width:{pct}%;"></div>
         </div>
         <div style="font-size:1.1rem;font-weight:700;color:#34D399;">{pct}% of target achieved</div>
     </div>
@@ -558,13 +558,13 @@ with tab_archive:
 
     st.markdown(f"""
     <div style="display:flex;align-items:center;gap:0.8rem;margin-bottom:0.3rem;">
-        <div class="section-title" style="font-size:1.1rem;">🗂️ Archived Listings</div>
+        <div class="section-title"style="font-size:1.1rem;">Archived Listings</div>
         <span style="background:rgba(251,146,60,0.15);color:#FB923C;border:1px solid rgba(251,146,60,0.3);
                      padding:2px 12px;border-radius:20px;font-size:0.8rem;font-weight:700;">
             {len(archived)} archived
         </span>
     </div>
-    <div class="section-sub" style="margin-bottom:1.2rem;">
+    <div class="section-sub"style="margin-bottom:1.2rem;">
         Archived listings are hidden from the platform but safely stored here.
         Restore them to make them active again, or permanently delete when certain.
     </div>
@@ -572,11 +572,11 @@ with tab_archive:
 
     if not archived:
         st.markdown("""
-        <div class="glass-card" style="text-align:center;padding:3rem;">
-            <div style="font-size:2.5rem;">🗂️</div>
+        <div class="glass-card"style="text-align:center;padding:3rem;">
+            <div style="font-size:2.5rem;"></div>
             <div style="font-weight:600;color:#FB923C;margin-top:0.8rem;">Archive is empty</div>
             <div style="font-size:0.85rem;color:rgba(228,237,255,0.4);margin-top:0.4rem;">
-                Archive completed listings from the 🥬 Listings tab to see them here.
+                Archive completed listings from the Listings tab to see them here.
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -585,47 +585,47 @@ with tab_archive:
         bulk_c1, bulk_c2, bulk_c3 = st.columns([2, 2, 3])
         with bulk_c1:
             if not st.session_state.get("confirm_restore_all", False):
-                if st.button("↩️ Restore ALL", key="restore_all_btn", use_container_width=True):
+                if st.button("Restore ALL", key="restore_all_btn", use_container_width=True):
                     st.session_state["confirm_restore_all"] = True
                     st.rerun()
             else:
                 st.warning(f"Restore all **{len(archived)}** listings?")
                 ra1, ra2 = st.columns(2)
                 with ra1:
-                    if st.button("✅ Yes", key="restore_all_yes", use_container_width=True):
+                    if st.button("Yes", key="restore_all_yes", use_container_width=True):
                         for a in archived:
                             restore_archived_listing(a["listing_id"])
                         st.session_state["confirm_restore_all"] = False
-                        st.toast(f"↩️ Restored {len(archived)} listings!", icon="✅")
+                        st.toast(f"Restored {len(archived)} listings!")
                         st.rerun()
                 with ra2:
-                    if st.button("✖ No", key="restore_all_no", use_container_width=True):
+                    if st.button("No", key="restore_all_no", use_container_width=True):
                         st.session_state["confirm_restore_all"] = False
                         st.rerun()
         with bulk_c2:
             if not st.session_state.get("confirm_purge_all", False):
-                if st.button("🗑️ Purge ALL Archived", key="purge_all_btn", use_container_width=True):
+                if st.button("Purge ALL Archived", key="purge_all_btn", use_container_width=True):
                     st.session_state["confirm_purge_all"] = True
                     st.rerun()
             else:
-                st.error(f"⚠️ Permanently delete **{len(archived)}** archived listings? This cannot be undone.")
+                st.error(f"Permanently delete **{len(archived)}** archived listings? This cannot be undone.")
                 pa1, pa2 = st.columns(2)
                 with pa1:
-                    if st.button("✅ Yes, Purge", key="purge_all_yes", use_container_width=True):
+                    if st.button("Yes, Purge", key="purge_all_yes", use_container_width=True):
                         for a in archived:
                             delete_food_listing(a["listing_id"])
                         st.session_state["confirm_purge_all"] = False
-                        st.toast(f"🗑️ Purged {len(archived)} listings.", icon="✅")
+                        st.toast(f"Purged {len(archived)} listings.")
                         st.rerun()
                 with pa2:
-                    if st.button("✖ No", key="purge_all_no", use_container_width=True):
+                    if st.button("No", key="purge_all_no", use_container_width=True):
                         st.session_state["confirm_purge_all"] = False
                         st.rerun()
         with bulk_c3:
             st.markdown("""
             <div style="font-size:0.75rem;color:rgba(228,237,255,0.35);padding-top:0.5rem;">
-                ↩️ Restore puts listings back to their previous status (delivered/disposed).<br>
-                🗑️ Purge permanently removes them from the database.
+                Restore puts listings back to their previous status (delivered/disposed).<br>
+                Purge permanently removes them from the database.
             </div>
             """, unsafe_allow_html=True)
 
@@ -633,28 +633,28 @@ with tab_archive:
 
         # Per-archived-listing rows
         for listing in archived:
-            lid   = listing["listing_id"]
-            name  = listing.get("food_name", "Unknown")
+            lid = listing["listing_id"]
+            name = listing.get("food_name", "Unknown")
             donor = listing.get("donor_name", "—")
-            qty   = listing.get("quantity_kg", 0)
-            prev_stat  = listing.get("pre_archive_status", "delivered")
-            addr  = listing.get("address", "")[:40]
-            arc_time   = str(listing.get("archived_at", ""))[:16]
-            prev_color = "#34D399" if prev_stat == "delivered" else "#F87171"
+            qty = listing.get("quantity_kg", 0)
+            prev_stat = listing.get("pre_archive_status", "delivered")
+            addr = listing.get("address", "")[:40]
+            arc_time = str(listing.get("archived_at", ""))[:16]
+            prev_color = "#34D399"if prev_stat == "delivered"else"#F87171"
 
             row_info, row_restore, row_purge = st.columns([5, 1, 1])
             with row_info:
                 st.markdown(f"""
-                <div class="glass-card" style="padding:0.75rem 1rem;margin-bottom:0.3rem;
+                <div class="glass-card"style="padding:0.75rem 1rem;margin-bottom:0.3rem;
                              border-left:3px solid #FB923C;
                              display:flex;flex-wrap:wrap;gap:0.5rem 1.5rem;align-items:center;">
                     <div>
                         <div style="font-weight:700;font-size:0.9rem;color:#E4EDFF;">{name}</div>
-                        <div style="font-size:0.75rem;color:rgba(228,237,255,0.4);">📍 {addr}</div>
+                        <div style="font-size:0.75rem;color:rgba(228,237,255,0.4);"> {addr}</div>
                     </div>
-                    <div style="font-size:0.78rem;color:rgba(228,237,255,0.55);">👤 {donor}</div>
-                    <div style="font-size:0.78rem;color:rgba(228,237,255,0.55);">⚖️ {qty} kg</div>
-                    <div style="font-size:0.75rem;color:rgba(228,237,255,0.35);">🗂️ Archived: {arc_time}</div>
+                    <div style="font-size:0.78rem;color:rgba(228,237,255,0.55);"> {donor}</div>
+                    <div style="font-size:0.78rem;color:rgba(228,237,255,0.55);"> {qty} kg</div>
+                    <div style="font-size:0.75rem;color:rgba(228,237,255,0.35);">Archived: {arc_time}</div>
                     <span style="background:{prev_color}22;color:{prev_color};border:1px solid {prev_color}55;
                                  padding:2px 8px;border-radius:20px;font-size:0.7rem;font-weight:700;">
                         was {prev_stat.upper()}
@@ -663,24 +663,24 @@ with tab_archive:
                 """, unsafe_allow_html=True)
             with row_restore:
                 st.markdown("<div style='height:0.55rem'></div>", unsafe_allow_html=True)
-                if st.button("↩️", key=f"restore_{lid}", use_container_width=True,
-                             help=f"Restore '{name}'"):
+                if st.button("", key=f"restore_{lid}", use_container_width=True,
+                             help=f"Restore'{name}'"):
                     restore_archived_listing(lid)
-                    st.toast(f"Restored: {name}", icon="↩️")
+                    st.toast(f"Restored: {name}")
                     st.rerun()
             with row_purge:
                 st.markdown("<div style='height:0.55rem'></div>", unsafe_allow_html=True)
-                if st.button("🗑️", key=f"purge_{lid}", use_container_width=True,
-                             help=f"Permanently delete '{name}'"):
+                if st.button("", key=f"purge_{lid}", use_container_width=True,
+                             help=f"Permanently delete'{name}'"):
                     purge_food_listing(lid)
-                    st.toast(f"Purged: {name}", icon="🗑️")
+                    st.toast(f"Purged: {name}")
                     st.rerun()
 
     st.markdown("<br>", unsafe_allow_html=True)
-    st.info("💡 **Retention Policy:** Archived listings are kept for 30 days before permanent automatic cleanup. You can restore them to the active board anytime before then.", icon="📅")
+    st.info(" **Retention Policy:** Archived listings are kept for 30 days before permanent automatic cleanup. You can restore them to the active board anytime before then.")
 
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("#### 🔔 Archived Notifications")
+    st.markdown("#### Archived Notifications")
     arc_notifs = get_archived_notifications()
     if not arc_notifs:
         st.write("No archived notifications.")
@@ -690,11 +690,11 @@ with tab_archive:
             title = an.get("title", "No Title")
             msg = an.get("message", "")
             arc_at = str(an.get("archived_at", ""))[:16]
-            
+
             acol1, acol2 = st.columns([8, 1])
             with acol1:
                 st.markdown(f"""
-                <div class="glass-card" style="padding:0.6rem 1rem; margin-bottom:0.3rem; border-left:3px solid #6366F1;">
+                <div class="glass-card"style="padding:0.6rem 1rem; margin-bottom:0.3rem; border-left:3px solid #6366F1;">
                     <div style="font-weight:700; font-size:0.85rem;">{title}</div>
                     <div style="font-size:0.75rem; color:rgba(228,237,255,0.6);">{msg}</div>
                     <div style="font-size:0.65rem; color:rgba(228,237,255,0.3); margin-top:0.2rem;">Archived: {arc_at}</div>
@@ -702,7 +702,7 @@ with tab_archive:
                 """, unsafe_allow_html=True)
             with acol2:
                 st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
-                if st.button("🗑️", key=f"purge_notif_{anid}", help="Permanently delete notification"):
+                if st.button("", key=f"purge_notif_{anid}", help="Permanently delete notification"):
                     purge_notification(anid)
                     st.toast("Notification permanently purged")
                     st.rerun()
@@ -712,29 +712,29 @@ with tab_archive:
 # TAB 7 — FEEDBACK
 # ════════════════════════════════════════════════════════════
 with tab_feedback:
-    st.markdown("### 💬 User Feedback")
+    st.markdown("### User Feedback")
     st.markdown("Review feedback submitted by donors and receivers.")
-    
+
     feedbacks = get_all_feedback()
-    
+
     if not feedbacks:
         st.info("No feedback has been submitted yet.")
     else:
         # Calculate average rating
         avg_rating = sum(f.get("rating", 0) for f in feedbacks) / len(feedbacks)
-        st.markdown(f"**Average Rating:** {'⭐' * int(avg_rating)} ({avg_rating:.1f}/5.0 from {len(feedbacks)} reviews)")
+        st.markdown(f"**Average Rating:** {'' * int(avg_rating)} ({avg_rating:.1f}/5.0 from {len(feedbacks)} reviews)")
         st.markdown("<hr>", unsafe_allow_html=True)
-        
+
         for fb in feedbacks:
             fb_id = fb.get("feedback_id")
-            stars = "⭐" * fb.get("rating", 0)
-            role_badge = "🍽️ Donor" if fb.get("role") == "donor" else "🤝 Receiver"
+            stars = "" * fb.get("rating", 0)
+            role_badge = "Donor"if fb.get("role") == "donor"else"Receiver"
             time_str = str(fb.get("timestamp", ""))[:16]
-            
+
             col_fb_text, col_fb_del = st.columns([6, 1])
             with col_fb_text:
                 st.markdown(f"""
-                <div class="glass-card" style="padding:1.2rem;margin-bottom:1rem;border-left:4px solid #6366F1;">
+                <div class="glass-card"style="padding:1.2rem;margin-bottom:1rem;border-left:4px solid #6366F1;">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;">
                         <div style="font-weight:700;color:#fff;">{fb.get('user_name')} &nbsp; 
                             <span style="background:rgba(255,255,255,0.08);padding:2px 8px;border-radius:12px;font-size:0.7rem;font-weight:400;">
@@ -751,7 +751,7 @@ with tab_feedback:
                 """, unsafe_allow_html=True)
             with col_fb_del:
                 st.markdown("<div style='height:1.2rem'></div>", unsafe_allow_html=True)
-                if st.button("🗑️", key=f"del_fb_{fb_id}", use_container_width=True, help="Delete this feedback"):
+                if st.button("", key=f"del_fb_{fb_id}", use_container_width=True, help="Delete this feedback"):
                     delete_feedback(fb_id)
                     st.toast("Feedback deleted")
                     st.rerun()

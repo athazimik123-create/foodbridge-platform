@@ -2,13 +2,13 @@
 # pages/01_Donor.py — Donor Dashboard
 # ============================================================
 # Donors can:
-#  • List new surplus food (with quantity, location, type)
-#  • View and manage their active listings
-#  • See impact stats
+# • List new surplus food (with quantity, location, type)
+# • View and manage their active listings
+# • See impact stats
 # ============================================================
 
 import streamlit as st
-st.set_page_config(page_title="Donor Dashboard · FoodBridge", page_icon="🍽️", layout="wide")
+st.set_page_config(page_title="Donor Dashboard · FoodBridge", page_icon=None, layout="wide")
 
 import time
 from datetime import datetime, timezone, timedelta
@@ -27,12 +27,12 @@ st.markdown(get_css(), unsafe_allow_html=True)
 # ── Auth guard ────────────────────────────────────────────────
 if not st.session_state.get("authenticated"):
     st.warning("Please sign in to access the Donor Dashboard.")
-    st.page_link("app.py", label="← Back to Login")
+    st.page_link("app.py", label="Back to Login")
     st.stop()
 
 if st.session_state.get("user_role") not in ("donor", "admin"):
-    st.warning("⚠️ This page is for Donors and Admins only.")
-    st.page_link("app.py", label="← Go Home")
+    st.warning("This page is for Donors and Admins only.")
+    st.page_link("app.py", label="Go Home")
     st.stop()
 
 # ── Sidebar ───────────────────────────────────────────────────
@@ -45,7 +45,7 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    role_icon = {"admin": "🛡️", "donor": "🍽️", "receiver": "🤝"}.get(st.session_state.user_role, "👤")
+    role_icon = {"admin": "", "donor": "", "receiver": ""}.get(st.session_state.user_role, "")
     st.markdown(f"""
     <div class="sidebar-user">
         <div class="su-name">{role_icon} {st.session_state.user_name}</div>
@@ -53,17 +53,17 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    st.page_link("app.py", label="🏠 Home")
-    st.page_link("pages/01_Donor.py", label="🍽️ Donor Dashboard")
-    st.page_link("pages/02_Receiver.py", label="🤝 Receiver Portal")
+    st.page_link("app.py", label="Home")
+    st.page_link("pages/01_Donor.py", label="Donor Dashboard")
+    st.page_link("pages/02_Receiver.py", label="Receiver Portal")
     if st.session_state.get("user_role") == "admin":
-        st.page_link("pages/03_Admin.py", label="🛡️ Admin")
-    st.page_link("pages/04_Route_Optimizer.py", label="🗺️ Route Optimizer")
-    st.page_link("pages/05_Feedback.py", label="💬 Feedback")
+        st.page_link("pages/03_Admin.py", label="Admin")
+    st.page_link("pages/04_Route_Optimizer.py", label="Route Optimizer")
+    st.page_link("pages/05_Feedback.py", label="Feedback")
     if st.session_state.get("user_role") in ("admin", "donor"):
-        st.page_link("pages/06_Spoilage_Detector.py", label="🧪 Spoilage Detector")
+        st.page_link("pages/06_Spoilage_Detector.py", label="Spoilage Detector")
     st.markdown("<hr>", unsafe_allow_html=True)
-    if st.button("🚪 Sign Out", use_container_width=True):
+    if st.button("Sign Out", use_container_width=True):
         for k in list(st.session_state.keys()): del st.session_state[k]
         st.switch_page("app.py")
 
@@ -71,7 +71,7 @@ with st.sidebar:
 st.markdown("""
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:0.8rem;">
     <div>
-        <div class="section-title">🍽️ Donor Dashboard</div>
+        <div class="section-title">Donor Dashboard</div>
         <div class="section-sub">List your surplus food and track your impact in real time</div>
     </div>
     <div class="live-badge"><span class="pulse-dot"></span>REAL-TIME</div>
@@ -79,7 +79,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ── Donor KPIs ────────────────────────────────────────────────
-uid  = st.session_state.uid
+uid = st.session_state.uid
 role = st.session_state.get("user_role", "donor")
 
 # Admin sees ALL platform listings; donors see only their own
@@ -90,9 +90,9 @@ else:
     my_listings = get_donor_listings(uid)
     listing_label = "My"
 
-total_kg  = sum(l.get("quantity_kg", 0) for l in my_listings)
+total_kg = sum(l.get("quantity_kg", 0) for l in my_listings)
 delivered = [l for l in my_listings if l["status"] == "delivered"]
-active    = [l for l in my_listings if l["status"] in ("available", "requested", "in_transit")]
+active = [l for l in my_listings if l["status"] in ("available", "requested", "in_transit")]
 
 # Admin context banner
 if role == "admin":
@@ -100,7 +100,7 @@ if role == "admin":
     <div style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.25);
                 border-radius:12px;padding:0.7rem 1rem;margin-bottom:1rem;
                 font-size:0.83rem;color:rgba(228,237,255,0.7);">
-        🛡️ <b style="color:#818CF8;">Admin View</b> — Showing all platform listings.
+        <b style="color:#818CF8;">Admin View</b> — Showing all platform listings.
         Donors only see their own submissions.
     </div>
     """, unsafe_allow_html=True)
@@ -116,8 +116,8 @@ st.markdown("<br>", unsafe_allow_html=True)
 # ════════════════════════════════════════════════════════════
 # TABS
 # ════════════════════════════════════════════════════════════
-tab_label = "📋 All Listings" if role == "admin" else "📋 My Listings"
-tab_list, tab_new, tab_map = st.tabs([tab_label, "➕ Add New Listing", "📍 Location Preview"])
+tab_label = "All Listings"if role == "admin"else"My Listings"
+tab_list, tab_new, tab_map = st.tabs([tab_label, "Add New Listing", "Location Preview"])
 
 # ── Priority helper ───────────────────────────────────────────
 def _get_priority(expiry_dt_str):
@@ -128,14 +128,14 @@ def _get_priority(expiry_dt_str):
         if exp.tzinfo is None:
             exp = exp.replace(tzinfo=_tz.utc)
         hours_left = (exp - datetime.now(_tz.utc)).total_seconds() / 3600
-        if hours_left <= 2:
-            return "High",   "#F87171", "🔴"
-        elif hours_left <= 48:
-            return "Medium", "#FB923C", "🟠"
+        if hours_left<= 2:
+            return"High", "#F87171", ""
+        elif hours_left<= 48:
+            return"Medium", "#FB923C", ""
         else:
-            return "Low",    "#34D399", "🟢"
+            return"Low", "#34D399", ""
     except Exception:
-        return "Low",    "#34D399", "🟢"
+        return"Low", "#34D399", ""
 
 def _priority_badge(expiry_dt_str):
     label, colour, icon = _get_priority(expiry_dt_str)
@@ -155,20 +155,20 @@ with tab_list:
     with col_filter:
         status_filter = st.selectbox("Filter by Status", ["All", "available", "requested", "in_transit", "delivered"])
     with col_sort:
-        sort_by = st.selectbox("Sort By", ["Newest First", "Quantity (High→Low)"])
+        sort_by = st.selectbox("Sort By", ["Newest First", "Quantity (HighLow)"])
 
     filtered = my_listings
     if status_filter != "All":
         filtered = [l for l in filtered if l["status"] == status_filter]
-    if sort_by == "Quantity (High→Low)":
+    if sort_by == "Quantity (HighLow)":
         filtered.sort(key=lambda x: x.get("quantity_kg", 0), reverse=True)
 
     if not filtered:
-        st.markdown("""<div class="glass-card" style="text-align:center;padding:3rem;">
-            <div style="font-size:2.5rem;">🌾</div>
+        st.markdown("""<div class="glass-card"style="text-align:center;padding:3rem;">
+            <div style="font-size:2.5rem;"></div>
             <div style="font-weight:600;color:#34D399;margin-top:0.8rem;">No listings found</div>
             <div style="font-size:0.85rem;color:rgba(228,237,255,0.45);margin-top:0.4rem;">
-                Use the <b>Add New Listing</b> tab to submit surplus food.
+                Use the<b>Add New Listing</b>tab to submit surplus food.
             </div>
         </div>""", unsafe_allow_html=True)
     else:
@@ -181,40 +181,40 @@ with tab_list:
                     st.markdown(render_food_card(listing), unsafe_allow_html=True)
                     # Priority badge
                     st.markdown(_priority_badge(listing.get("expiry_dt", "")), unsafe_allow_html=True)
-                    lid    = listing["listing_id"]
+                    lid = listing["listing_id"]
                     status = listing["status"]
 
                     # ── Action buttons ────────────────────────
                     if status == "available":
                         btn_col1, btn_col2 = st.columns(2)
                         with btn_col1:
-                            if st.button("✏️ Edit", key=f"edit_btn_{lid}", use_container_width=True):
+                            if st.button("Edit", key=f"edit_btn_{lid}", use_container_width=True):
                                 st.session_state[f"editing_{lid}"] = not st.session_state.get(f"editing_{lid}", False)
                                 st.session_state[f"confirming_delete_{lid}"] = False
                         with btn_col2:
-                            if st.button("🗑️ Delete", key=f"del_btn_{lid}", use_container_width=True):
+                            if st.button("Delete", key=f"del_btn_{lid}", use_container_width=True):
                                 st.session_state[f"confirming_delete_{lid}"] = not st.session_state.get(f"confirming_delete_{lid}", False)
                                 st.session_state[f"editing_{lid}"] = False
 
                         # ── Delete confirmation ───────────────
                         if st.session_state.get(f"confirming_delete_{lid}", False):
-                            st.warning("⚠️ This will move the listing to the Archive. Are you sure?")
+                            st.warning("This will move the listing to the Archive. Are you sure?")
                             conf_col1, conf_col2 = st.columns(2)
                             with conf_col1:
-                                if st.button("✅ Yes, Remove", key=f"confirm_del_{lid}", use_container_width=True):
+                                if st.button("Yes, Remove", key=f"confirm_del_{lid}", use_container_width=True):
                                     delete_food_listing(lid)
                                     st.session_state.pop(f"confirming_delete_{lid}", None)
-                                    st.toast("Listing moved to Archive.", icon="🗂️")
+                                    st.toast("Listing moved to Archive.")
                                     time.sleep(0.6)
                                     st.rerun()
                             with conf_col2:
-                                if st.button("✖ Cancel", key=f"cancel_del_{lid}", use_container_width=True):
+                                if st.button("Cancel", key=f"cancel_del_{lid}", use_container_width=True):
                                     st.session_state[f"confirming_delete_{lid}"] = False
                                     st.rerun()
 
                         # ── Inline edit form ──────────────────
                         if st.session_state.get(f"editing_{lid}", False):
-                            with st.expander("✏️ Edit Listing", expanded=True):
+                            with st.expander("Edit Listing", expanded=True):
                                 with st.form(key=f"edit_form_{lid}"):
                                     e_food_name = st.text_input(
                                         "Food Name", value=listing.get("food_name", ""))
@@ -250,7 +250,7 @@ with tab_list:
                                     e_expiry_hrs = st.slider(
                                         "Extend Food Safe For (hours from now)", 1, 72, 8)
 
-                                    save_btn = st.form_submit_button("💾 Save Changes", use_container_width=True)
+                                    save_btn = st.form_submit_button("Save Changes", use_container_width=True)
 
                                 if save_btn:
                                     if not e_food_name or not e_address:
@@ -258,36 +258,36 @@ with tab_list:
                                     else:
                                         new_expiry = (datetime.now(timezone.utc) + timedelta(hours=e_expiry_hrs)).isoformat()
                                         update_food_listing(lid, {
-                                            "food_name":     e_food_name,
-                                            "food_type":     e_food_type,
-                                            "quantity_kg":   e_qty,
-                                            "servings":      e_servings,
-                                            "address":       e_address,
+                                            "food_name": e_food_name,
+                                            "food_type": e_food_type,
+                                            "quantity_kg": e_qty,
+                                            "servings": e_servings,
+                                            "address": e_address,
                                             "pickup_window": e_pickup_win,
-                                            "description":   e_desc,
-                                            "tags":          [t.strip() for t in e_tags_str.split(",") if t.strip()],
-                                            "expiry_dt":     new_expiry,
+                                            "description": e_desc,
+                                            "tags": [t.strip() for t in e_tags_str.split(",") if t.strip()],
+                                            "expiry_dt": new_expiry,
                                         })
                                         st.session_state[f"editing_{lid}"] = False
-                                        st.toast("✅ Listing updated!", icon="✏️")
+                                        st.toast("Listing updated!")
                                         time.sleep(0.6)
                                         st.rerun()
 
                     elif status == "requested":
-                        if st.button("✅ Confirm Handover", key=f"hov_{lid}", use_container_width=True):
+                        if st.button("Confirm Handover", key=f"hov_{lid}", use_container_width=True):
                             update_listing_status(lid, "in_transit")
-                            st.toast("Handover confirmed! Marked as in transit.", icon="🚚")
+                            st.toast("Handover confirmed! Marked as in transit.")
                             time.sleep(0.8)
                             st.rerun()
                     elif status == "in_transit":
-                        if st.button("🏁 Mark Delivered", key=f"mark_del_{lid}", use_container_width=True):
+                        if st.button("Mark Delivered", key=f"mark_del_{lid}", use_container_width=True):
                             update_listing_status(lid, "delivered")
-                            st.toast("Marked as delivered! Great work 🎉", icon="🍱")
+                            st.toast("Marked as delivered! Great work")
                             time.sleep(0.8)
                             st.rerun()
                     else:
                         st.markdown("""<div style="font-size:0.78rem;color:rgba(228,237,255,0.35);
-                            padding:0.4rem;text-align:center;">✓ Completed</div>""",
+                            padding:0.4rem;text-align:center;">Completed</div>""",
                             unsafe_allow_html=True)
 
 
@@ -295,12 +295,12 @@ with tab_list:
 # TAB 2 — ADD NEW LISTING
 # ════════════════════════════════════════════════════════════
 with tab_new:
-    st.markdown("""<div class="glass-card" style="margin-bottom:1.5rem;">
+    st.markdown("""<div class="glass-card"style="margin-bottom:1.5rem;">
         <div style="font-size:1.1rem;font-weight:700;margin-bottom:0.8rem;color:#34D399;">
-            📦 Submit Surplus Food Listing
+            Submit Surplus Food Listing
         </div>
         <div style="font-size:0.82rem;color:rgba(228,237,255,0.5);">
-            Fill in the details below. Your listing will be <b style="color:#fff;">immediately visible</b>
+            Fill in the details below. Your listing will be<b style="color:#fff;">immediately visible</b>
             to receivers and NGOs on the platform.
         </div>
     </div>""", unsafe_allow_html=True)
@@ -308,31 +308,31 @@ with tab_new:
     with st.form("add_listing_form", clear_on_submit=True):
         col_a, col_b = st.columns(2)
         with col_a:
-            food_name  = st.text_input("Food Name *", placeholder="e.g. Fresh Bread, Cooked Dal, Seasonal Fruits")
-            food_type  = st.selectbox("Food Type *", [
+            food_name = st.text_input("Food Name *", placeholder="e.g. Fresh Bread, Cooked Dal, Seasonal Fruits")
+            food_type = st.selectbox("Food Type *", [
                 "Bakery", "Prepared Meals", "Produce", "Dairy",
                 "Seafood", "Grains", "Fruits", "Snacks", "Mixed"
             ])
-            quantity   = st.number_input("Quantity (kg) *", min_value=0.1, max_value=5000.0, value=5.0, step=0.5)
-            servings   = st.number_input("Estimated Servings", min_value=1, max_value=10000, value=int(quantity * 2.5))
+            quantity = st.number_input("Quantity (kg) *", min_value=0.1, max_value=5000.0, value=5.0, step=0.5)
+            servings = st.number_input("Estimated Servings", min_value=1, max_value=10000, value=int(quantity * 2.5))
 
         with col_b:
-            address    = st.text_input("Pickup Address *", placeholder="Full address with city")
+            address = st.text_input("Pickup Address *", placeholder="Full address with city")
             pickup_win = st.selectbox("Pickup Window", [
                 "Morning (6am–12pm)", "Afternoon (12pm–5pm)", "Evening (5pm–9pm)", "Flexible (Anytime)"
             ])
             expiry_hrs = st.slider("Food Safe For (hours)", 1, 72, 8)
-            premium    = st.checkbox("⚡ Enable Priority Pickup (+₹499 platform fee)",
+            premium = st.checkbox("Enable Priority Pickup (+₹499 platform fee)",
                                      help="Logistics partners prioritize premium pickups")
 
         description = st.text_area("Description", placeholder="Add details about quantity, condition, packaging, etc.", height=90)
-        tags_input  = st.text_input("Tags (comma-separated)", placeholder="veg, hot-food, packaged")
+        tags_input = st.text_input("Tags (comma-separated)", placeholder="veg, hot-food, packaged")
 
         st.markdown("""<div style="font-size:0.8rem;color:rgba(228,237,255,0.45);margin-bottom:1rem;margin-top:0.5rem;padding-left:0.5rem;border-left:3px solid #34D399;">
-            📍 <i>Your exact pickup coordinates will be automatically determined from your address when you publish.</i>
+            <i>Your exact pickup coordinates will be automatically determined from your address when you publish.</i>
         </div>""", unsafe_allow_html=True)
 
-        submit = st.form_submit_button("🚀 Publish Listing", use_container_width=True)
+        submit = st.form_submit_button("Publish Listing", use_container_width=True)
 
     if submit:
         if not food_name or not address:
@@ -356,19 +356,19 @@ with tab_new:
                 tags = [t.strip() for t in tags_input.split(",") if t.strip()]
                 expiry_dt = (datetime.now(timezone.utc) + timedelta(hours=expiry_hrs)).isoformat()
                 data = {
-                    "donor_id":     uid,
-                    "donor_name":   st.session_state.user_name,
-                    "food_name":    food_name,
-                    "food_type":    food_type,
-                    "quantity_kg":  quantity,
-                    "servings":     servings,
-                    "description":  description,
-                    "address":      address,
-                    "lat":          lat,
-                    "lng":          lng,
-                    "expiry_dt":    expiry_dt,
+                    "donor_id": uid,
+                    "donor_name": st.session_state.user_name,
+                    "food_name": food_name,
+                    "food_type": food_type,
+                    "quantity_kg": quantity,
+                    "servings": servings,
+                    "description": description,
+                    "address": address,
+                    "lat": lat,
+                    "lng": lng,
+                    "expiry_dt": expiry_dt,
                     "pickup_window": pickup_win,
-                    "tags":          tags,
+                    "tags": tags,
                     "premium_pickup": premium,
                 }
                 listing_id = create_food_listing(data)
@@ -376,7 +376,7 @@ with tab_new:
                     log_transaction(uid, 499.0, "logistics_fee", {"listing_id": listing_id})
 
             st.success(f"""
-            ✅ **Listing Published!** Listing ID: `{listing_id}`
+            **Listing Published!** Listing ID: `{listing_id}`
             Your surplus food is now live and visible to all receivers on the platform.
             """)
             st.balloons()
@@ -392,7 +392,7 @@ with tab_map:
     </div>""", unsafe_allow_html=True)
 
     if not my_listings:
-        st.info("No listings to show on map yet. Add a listing first.", icon="📍")
+        st.info("No listings to show on map yet. Add a listing first.")
     else:
         # Build interactive map using Google Maps embed or folium fallback
         try:
@@ -429,7 +429,7 @@ with tab_map:
 
         except ImportError:
             # Fallback: table view of coordinates
-            st.warning("Install `folium` and `streamlit-folium` for interactive maps.", icon="🗺️")
+            st.warning("Install `folium` and `streamlit-folium` for interactive maps.")
             import pandas as pd
             map_data = [{"Food": l.get("food_name"), "lat": l.get("lat"), "lon": l.get("lng"),
                          "Status": l.get("status"), "Qty (kg)": l.get("quantity_kg")}
